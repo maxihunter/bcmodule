@@ -22,6 +22,12 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "enc28j60.h"
+#include "iplayer.h"
+#include "dhcpd.h"
+#include "net.h"
+#include <stdio.h>
+#include <string.h>
 
 /* USER CODE END Includes */
 
@@ -37,12 +43,11 @@
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
+#define SW_VER 1
 
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
-RTC_HandleTypeDef hrtc;
-
 SPI_HandleTypeDef hspi1;
 SPI_HandleTypeDef hspi2;
 
@@ -51,13 +56,15 @@ UART_HandleTypeDef huart1;
 PCD_HandleTypeDef hpcd_USB_FS;
 
 /* USER CODE BEGIN PV */
+struct inet_addr net_addr = {0};
+static const uint8_t mac[] = {0xD2, 0x18, 0XBB, 0x55, 0x66, 0x77};
+static long lastDhcpRequest = 0;
 
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
-static void MX_RTC_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_SPI2_Init(void);
 static void MX_USB_PCD_Init(void);
@@ -68,6 +75,19 @@ static void MX_USART1_UART_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+int _write(int file, char *ptr, int len)
+{
+    HAL_StatusTypeDef hstatus;
+
+    if (file == 1 || file == 2) {
+        hstatus = HAL_UART_Transmit(&huart1, (uint8_t*) ptr, len, HAL_MAX_DELAY);
+        if (hstatus == HAL_OK)
+            return len;
+        else
+            return -1;
+    }
+    return -1;
+}
 
 /* USER CODE END 0 */
 
@@ -100,13 +120,53 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_RTC_Init();
   MX_SPI1_Init();
   MX_SPI2_Init();
   MX_USB_PCD_Init();
   MX_FATFS_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
+  printf("Hello from BCModule ver.%d\r\n\r\n", SW_VER);
+  printf("Init system...\r\n");
+  printf("Clock OK\r\n");
+
+  FATFS fs;
+  FRESULT res;
+  res = f_mount(&fs, USERPath, 1);
+  if (res != FR_OK) {
+      printf("SDCard not found\r\n");
+  } else {
+      printf("SDCard OK\r\n");
+  }
+  
+  enc28j60_set_spi(&hspi2);
+  enc28j60Init(mac);
+  printf("Network OK\r\n");
+  //enc28j60DisableBroadcast();
+  //enc28j60DisableMulticast();
+  
+  /*uint8_t bbuff[] = "HERE IS ONE PACKEttttttttttttttttttttttttttttttttttttttttttTTTTTTTTTTT";
+
+  memcpy(bbuff + ETH_SRC_MAC, mac, 6);
+  memset(bbuff + ETH_DST_MAC, 0xFF, 6);
+  enc28j60PacketSend(40, bbuff);*/
+
+  lastDhcpRequest = HAL_GetTick();
+  memcpy(net_addr.macaddr, mac, 6);
+  printf("Getting IP from DHCP... (%x:%x:%x:%x:%x:%x)\r\n", 
+          net_addr.macaddr[0], net_addr.macaddr[1], net_addr.macaddr[2], net_addr.macaddr[3],
+          net_addr.macaddr[4], net_addr.macaddr[5]);
+  initDhcp(&net_addr);
+  printf(
+          "\tIP address: %d.%d.%d.%d\r\n"
+          "\tIP netmask: %d.%d.%d.%d\r\n"
+          "\tGW address: %d.%d.%d.%d\r\n"
+          "\tDNS address: %d.%d.%d.%d\r\n",
+          net_addr.ipaddr[0], net_addr.ipaddr[1], net_addr.ipaddr[2], net_addr.ipaddr[3],
+          net_addr.mask[0], net_addr.mask[1], net_addr.mask[2], net_addr.mask[3], 
+          net_addr.gateway[0], net_addr.gateway[1], net_addr.gateway[2], net_addr.gateway[3], 
+          net_addr.dnssrv[0], net_addr.dnssrv[1], net_addr.dnssrv[2], net_addr.dnssrv[3] 
+          );
 
   /* USER CODE END 2 */
 
@@ -114,6 +174,13 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+    HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
+    /*if (enc28j60linkup()) {
+      HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
+    } else {
+      HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET);
+    }*/
+    HAL_Delay(100);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -134,10 +201,9 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE|RCC_OSCILLATORTYPE_LSE;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
   RCC_OscInitStruct.HSEPredivValue = RCC_HSE_PREDIV_DIV1;
-  RCC_OscInitStruct.LSEState = RCC_LSE_ON;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
@@ -160,71 +226,12 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
-  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_RTC|RCC_PERIPHCLK_USB;
-  PeriphClkInit.RTCClockSelection = RCC_RTCCLKSOURCE_LSE;
+  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USB;
   PeriphClkInit.UsbClockSelection = RCC_USBCLKSOURCE_PLL_DIV1_5;
   if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
   {
     Error_Handler();
   }
-}
-
-/**
-  * @brief RTC Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_RTC_Init(void)
-{
-
-  /* USER CODE BEGIN RTC_Init 0 */
-
-  /* USER CODE END RTC_Init 0 */
-
-  RTC_TimeTypeDef sTime = {0};
-  RTC_DateTypeDef DateToUpdate = {0};
-
-  /* USER CODE BEGIN RTC_Init 1 */
-
-  /* USER CODE END RTC_Init 1 */
-
-  /** Initialize RTC Only
-  */
-  hrtc.Instance = RTC;
-  hrtc.Init.AsynchPrediv = RTC_AUTO_1_SECOND;
-  hrtc.Init.OutPut = RTC_OUTPUTSOURCE_ALARM;
-  if (HAL_RTC_Init(&hrtc) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  /* USER CODE BEGIN Check_RTC_BKUP */
-
-  /* USER CODE END Check_RTC_BKUP */
-
-  /** Initialize RTC and set the Time and Date
-  */
-  sTime.Hours = 0x0;
-  sTime.Minutes = 0x0;
-  sTime.Seconds = 0x0;
-
-  if (HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BCD) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  DateToUpdate.WeekDay = RTC_WEEKDAY_MONDAY;
-  DateToUpdate.Month = RTC_MONTH_SEPTEMBER;
-  DateToUpdate.Date = 0x8;
-  DateToUpdate.Year = 0x25;
-
-  if (HAL_RTC_SetDate(&hrtc, &DateToUpdate, RTC_FORMAT_BCD) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN RTC_Init 2 */
-
-  /* USER CODE END RTC_Init 2 */
-
 }
 
 /**
@@ -374,6 +381,7 @@ static void MX_USB_PCD_Init(void)
   */
 static void MX_GPIO_Init(void)
 {
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
   /* USER CODE BEGIN MX_GPIO_Init_1 */
 
   /* USER CODE END MX_GPIO_Init_1 */
@@ -383,6 +391,26 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOD_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin : PC13 */
+  GPIO_InitStruct.Pin = GPIO_PIN_13;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PA8 */
+  GPIO_InitStruct.Pin = GPIO_PIN_8;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_MEDIUM;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
 

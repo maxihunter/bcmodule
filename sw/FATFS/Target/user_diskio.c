@@ -35,9 +35,14 @@
 /* Includes ------------------------------------------------------------------*/
 #include <string.h>
 #include "ff_gen_drv.h"
+#include "sdcard.h"
 
 /* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/
+#define D_ATA                                                      0
+#define D_MMC                                                      1
+#define D_USB                                                      2
+#define SECTOR_SIZE                                              512U
 
 /* Private variables ---------------------------------------------------------*/
 /* Disk status */
@@ -117,6 +122,18 @@ DRESULT USER_read (
 )
 {
   /* USER CODE BEGIN READ */
+#if 0
+    if(count==1)
+    {
+        SD_ReadBlock(&buff[0] ,sector << 9,SECTOR_SIZE);
+        while(SD_GetTransferState() == SD_TRANSFER_IN_PROGRESS);
+    }
+    else
+    {
+        SD_ReadMultiBlocks((&buff[0]), sector << 9,SECTOR_SIZE,count);
+        while(SD_GetTransferState() == SD_TRANSFER_IN_PROGRESS);
+    }
+#endif
     return RES_OK;
   /* USER CODE END READ */
 }
@@ -139,6 +156,18 @@ DRESULT USER_write (
 {
   /* USER CODE BEGIN WRITE */
   /* USER CODE HERE */
+#if 0
+    if(count == 1)
+    {
+        SD_WriteBlock((BYTE*)(&buff[0]),sector << 9, SECTOR_SIZE);
+        while(SD_GetTransferState() == SD_TRANSFER_IN_PROGRESS);
+    }
+    else
+    {
+        SD_WriteMultiBlocks((BYTE*)(&buff[0]) , sector << 9, SECTOR_SIZE, count);
+        while(SD_GetTransferState() == SD_TRANSFER_IN_PROGRESS);
+    }
+#endif
     return RES_OK;
   /* USER CODE END WRITE */
 }
@@ -159,7 +188,30 @@ DRESULT USER_ioctl (
 )
 {
   /* USER CODE BEGIN IOCTL */
+    DRESULT res = RES_OK;
+#if 0
     DRESULT res = RES_ERROR;
+    SD_CardInfo CardInfo;
+    switch (cmd)
+    {
+        case CTRL_SYNC:
+            res = RES_OK;
+            break;
+        case GET_SECTOR_COUNT:
+            SD_GetCardInfo(&CardInfo);
+            *(DWORD*)buff = CardInfo.CardCapacity / 512;
+            res = RES_OK;
+            break;
+        case GET_SECTOR_SIZE:
+            *(DWORD*)buff = 512;
+            res= RES_OK;
+            break;
+        case GET_BLOCK_SIZE:
+            *(DWORD*)buff = 512;
+            res= RES_OK;
+            break;
+    }
+#endif
     return res;
   /* USER CODE END IOCTL */
 }

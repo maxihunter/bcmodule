@@ -1,0 +1,56 @@
+/*
+ * This file is part of the BCModule source code.
+ * Copyright (c) 2025 MaxiHunter
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+
+#ifndef __DHCP_H__
+#define __DHCP_H__
+
+#include <stdint.h>
+
+#define DHCP_HOSTNAME "stm32bcmod"
+#define DHCP_HOSTNAME_LEN 10
+
+#define DHCP_BOOTREQUEST 1
+#define DHCP_BOOTRESPONSE 2
+
+struct inet_addr {
+    uint8_t macaddr[6];
+    uint8_t ipaddr[4];
+    uint8_t mask[4];
+    uint8_t gateway[4];
+    uint8_t dhcpsrv[4];
+    uint8_t dnssrv[4];
+    uint32_t dncp_lease_time;
+    long dncp_last_lease;
+};
+
+extern void dhcp_start(uint8_t* buf, struct inet_addr * inaddr);
+
+extern uint8_t dhcp_state(void);
+
+uint8_t check_for_dhcp_answer(uint8_t* buf, uint16_t plen);
+
+uint8_t have_dhcpoffer(uint8_t* buf, uint16_t plen);
+uint8_t have_dhcpack(uint8_t* buf, uint16_t plen);
+
+#endif // __DHCP_H__
+
