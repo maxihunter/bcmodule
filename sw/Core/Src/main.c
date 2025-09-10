@@ -54,7 +54,7 @@ PCD_HandleTypeDef hpcd_USB_FS;
 
 /* USER CODE BEGIN PV */
 
-static const uint8_t mac[] = {0x02, 0x03, 0X04, 0x05, 0x06, 0x07};
+static const uint8_t mac[] = {0xD2, 0x18, 0XBB, 0x55, 0x66, 0x77};
 static uint8_t pbuf[400] = {};
 static uint8_t ipaddrin[4] = {};
 static uint8_t maskin[4] = {};
@@ -116,7 +116,6 @@ int main(void)
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
   enc28j60_set_spi(&hspi2);
-  //enc28j60PowerUp();
   enc28j60Init(mac);
   //enc28j60DisableBroadcast();
   //enc28j60DisableMulticast();
@@ -125,7 +124,7 @@ int main(void)
 
   memcpy(bbuff + ETH_SRC_MAC, mac, 6);
   memset(bbuff + ETH_DST_MAC, 0xFF, 6);
-  enc28j60PacketSend(40, bbuff);
+  //enc28j60PacketSend(40, bbuff);
 
   dhcp_start(pbuf, mac, ipaddrin, maskin, gwipin, dhcpsvrin, dnssvrin);
   /* USER CODE END 2 */
