@@ -23,9 +23,10 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "enc28j60.h"
+#include "iplayer.h"
 #include "dhcp.h"
 #include "net.h"
-//#include "fatfs.h"
+#include <stdio.h>
 
 /* USER CODE END Includes */
 
@@ -41,6 +42,8 @@
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
+#define SW_VER 1
+#define PBUFF_LEN 400
 
 /* USER CODE END PM */
 
@@ -55,12 +58,13 @@ PCD_HandleTypeDef hpcd_USB_FS;
 /* USER CODE BEGIN PV */
 
 static const uint8_t mac[] = {0xD2, 0x18, 0XBB, 0x55, 0x66, 0x77};
-static uint8_t pbuf[400] = {};
+static uint8_t pbuf[PBUFF_LEN] = {};
 static uint8_t ipaddrin[4] = {};
 static uint8_t maskin[4] = {};
 static uint8_t gwipin[4] = {};
 static uint8_t dhcpsvrin[4] = {};
 static uint8_t dnssvrin[4] = {};
+static long lastDhcpRequest = 0;
 
 /* USER CODE END PV */
 
@@ -77,6 +81,19 @@ static void MX_USART1_UART_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+int _write(int file, char *ptr, int len)
+{
+    HAL_StatusTypeDef hstatus;
+
+    if (file == 1 || file == 2) {
+        hstatus = HAL_UART_Transmit(&huart1, (uint8_t*) ptr, len, HAL_MAX_DELAY);
+        if (hstatus == HAL_OK)
+            return len;
+        else
+            return -1;
+    }
+    return -1;
+}
 
 /* USER CODE END 0 */
 
@@ -115,18 +132,44 @@ int main(void)
   MX_FATFS_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
+  printf("Hello from BCModule ver.%d\r\n\r\n", SW_VER);
+  printf("Init system...\r\n");
+  printf("Clock OK\r\n");
+
+  FATFS fs;
+  FRESULT res;
+  res = f_mount(&fs, USERPath, 1);
+  if (res != FR_OK) {
+      printf("SDCard not found\r\n");
+  } else {
+      printf("SDCard OK\r\n");
+  }
+  
   enc28j60_set_spi(&hspi2);
   enc28j60Init(mac);
+  printf("Network OK\r\n");
   //enc28j60DisableBroadcast();
   //enc28j60DisableMulticast();
   
-  uint8_t bbuff[] = "HERE IS ONE PACKEttttttttttttttttttttttttttttttttttttttttttTTTTTTTTTTT";
+  /*uint8_t bbuff[] = "HERE IS ONE PACKEttttttttttttttttttttttttttttttttttttttttttTTTTTTTTTTT";
 
   memcpy(bbuff + ETH_SRC_MAC, mac, 6);
   memset(bbuff + ETH_DST_MAC, 0xFF, 6);
-  //enc28j60PacketSend(40, bbuff);
+  enc28j60PacketSend(40, bbuff);*/
 
-  dhcp_start(pbuf, mac, ipaddrin, maskin, gwipin, dhcpsvrin, dnssvrin);
+  lastDhcpRequest = HAL_GetTick();
+  initDhcp(pbuf, PBUFF_LEN, mac, ipaddrin, maskin, gwipin, dhcpsvrin, dnssvrin);
+  printf(
+          "\tIP address: %d.%d.%d.%d\r\n"
+          "\tIP netmask: %d.%d.%d.%d\r\n"
+          "\tGW address: %d.%d.%d.%d\r\n"
+          "\tDNS address: %d.%d.%d.%d\r\n",
+          ipaddrin[0], ipaddrin[1], ipaddrin[2], ipaddrin[3],
+          maskin[0], maskin[1], maskin[2], maskin[3], 
+          gwipin[0], gwipin[1], gwipin[2], gwipin[3], 
+          dnssvrin[0], dnssvrin[1], dnssvrin[2], dnssvrin[3] 
+          );
+
   /* USER CODE END 2 */
 
   /* Infinite loop */

@@ -66,6 +66,7 @@ Core/Src/sysmem.c \
 Core/Src/syscalls.c \
 enc28j60/src/enc28j60.c \
 enc28j60/src/ip_arp_udp_tcp.c \
+enc28j60/src/iplayer.c \
 enc28j60/src/dhcp.c
 
 # ASM sources
