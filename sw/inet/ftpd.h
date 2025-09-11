@@ -1,0 +1,37 @@
+#ifndef __FTPD_H__
+#define __FTPD_H__
+
+enum ftp_cmd {
+	USER_CMD,
+	ACCT_CMD,
+	PASS_CMD,
+	TYPE_CMD,
+	LIST_CMD,
+	CWD_CMD,
+	DELE_CMD,
+	NAME_CMD,
+	QUIT_CMD,
+	RETR_CMD,
+	STOR_CMD,
+	PORT_CMD,
+	NLST_CMD,
+	PWD_CMD,
+	XPWD_CMD,
+	MKD_CMD,
+	XMKD_CMD,
+	XRMD_CMD,
+	RMD_CMD,
+	STRU_CMD,
+	MODE_CMD,
+	SYST_CMD,
+	XMD5_CMD,
+	XCWD_CMD,
+	FEAT_CMD,
+	PASV_CMD,
+	SIZE_CMD,
+	MLSD_CMD,
+	APPE_CMD,
+	NO_CMD,
+};
+
+#endif // __FTPD_H__
