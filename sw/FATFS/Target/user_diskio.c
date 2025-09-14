@@ -87,7 +87,7 @@ DSTATUS USER_initialize (
 {
   /* USER CODE BEGIN INIT */
     Stat = STA_NOINIT;
-    return 0;//Stat;
+    return Stat;
   /* USER CODE END INIT */
 }
 
@@ -122,6 +122,7 @@ DRESULT USER_read (
 )
 {
   /* USER CODE BEGIN READ */
+#if 0
     if(count==1)
     {
         SD_ReadBlock(&buff[0] ,sector << 9,SECTOR_SIZE);
@@ -132,6 +133,7 @@ DRESULT USER_read (
         SD_ReadMultiBlocks((&buff[0]), sector << 9,SECTOR_SIZE,count);
         while(SD_GetTransferState() == SD_TRANSFER_IN_PROGRESS);
     }
+#endif
     return RES_OK;
   /* USER CODE END READ */
 }
@@ -154,6 +156,7 @@ DRESULT USER_write (
 {
   /* USER CODE BEGIN WRITE */
   /* USER CODE HERE */
+#if 0
     if(count == 1)
     {
         SD_WriteBlock((BYTE*)(&buff[0]),sector << 9, SECTOR_SIZE);
@@ -164,6 +167,7 @@ DRESULT USER_write (
         SD_WriteMultiBlocks((BYTE*)(&buff[0]) , sector << 9, SECTOR_SIZE, count);
         while(SD_GetTransferState() == SD_TRANSFER_IN_PROGRESS);
     }
+#endif
     return RES_OK;
   /* USER CODE END WRITE */
 }
@@ -184,6 +188,8 @@ DRESULT USER_ioctl (
 )
 {
   /* USER CODE BEGIN IOCTL */
+    DRESULT res = RES_OK;
+#if 0
     DRESULT res = RES_ERROR;
     SD_CardInfo CardInfo;
     switch (cmd)
@@ -205,6 +211,7 @@ DRESULT USER_ioctl (
             res= RES_OK;
             break;
     }
+#endif
     return res;
   /* USER CODE END IOCTL */
 }
