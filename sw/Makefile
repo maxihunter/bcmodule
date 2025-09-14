@@ -64,6 +64,7 @@ Middlewares/Third_Party/FatFs/src/ff_gen_drv.c \
 Middlewares/Third_Party/FatFs/src/option/syscall.c \
 Core/Src/sysmem.c \
 Core/Src/syscalls.c \
+sd/sdcard.c \
 enc28j60/src/enc28j60.c \
 enc28j60/src/ip_arp_udp_tcp.c \
 enc28j60/src/iplayer.c \
@@ -139,6 +140,7 @@ C_INCLUDES =  \
 -IMiddlewares/Third_Party/FatFs/src \
 -IDrivers/CMSIS/Device/ST/STM32F1xx/Include \
 -IDrivers/CMSIS/Include \
+-Isd \
 -Ienc28j60/inc/
 
 

@@ -20,8 +20,8 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "sdcard.h"
-#include "stm32f10x_sdio.h"
-#include "stm32f10x_dma.h"
+//#include "stm32f10x_sdio.h"
+//#include "stm32f10x_dma.h"
 
 /** @addtogroup STM32F10x_StdPeriph_Examples
   * @{

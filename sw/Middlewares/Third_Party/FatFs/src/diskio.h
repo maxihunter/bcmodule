@@ -41,6 +41,7 @@ DWORD get_fattime (void);
 
 /* Disk Status Bits (DSTATUS) */
 
+#define STA_OK  		0x00	/* Drive OK */
 #define STA_NOINIT		0x01	/* Drive not initialized */
 #define STA_NODISK		0x02	/* No medium in the drive */
 #define STA_PROTECT		0x04	/* Write protected */
