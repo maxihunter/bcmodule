@@ -249,6 +249,93 @@ void dhcp_send(uint8_t* buf, uint8_t requestType) {
     send_udp_transmit(buf, bufPtr - buf - UDP_DATA_P);
 }
 
+// Main DHCP message sending function
+void dhcp_send_renew(uint8_t* buf) {
+    int i = 0;
+    haveDhcpAnswer = 0;
+    dhcp_ansError = 0;
+    dhcptid_l++;  // increment for next request, finally wrap
+    // destination IP gets replaced after this call
+
+    memset(buf, 0, 400);  // XXX OUCH!
+    send_udp_prepare(buf, (DHCPCLIENT_SRC_PORT_H << 8) | (dhcptid_l & 0xff), dhcpip, DHCP_DEST_PORT);
+
+    memcpy(buf + ETH_SRC_MAC, macaddr, 6);
+    memset(buf + ETH_DST_MAC, 0xFF, 6);
+    buf[IP_TOTLEN_L_P] = 0x82;
+    buf[IP_PROTO_P] = IP_PROTO_UDP_V;
+    memset(buf + IP_SRC_P, dhcpip, 4);
+    memset(buf + IP_DST_P, dhcpserver, 4);
+    buf[UDP_DST_PORT_L_P] = DHCP_SRC_PORT;
+    buf[UDP_SRC_PORT_H_P] = 0;
+    buf[UDP_SRC_PORT_L_P] = DHCP_DEST_PORT;
+
+    // Build DHCP Packet from buf[UDP_DATA_P]
+    // Make dhcpPtr start of UDP data buffer
+    dhcpData* dhcpPtr = (dhcpData*)&buf[UDP_DATA_P];
+    // 0-3 op, htype, hlen, hops
+    dhcpPtr->op = DHCP_BOOTREQUEST;
+    dhcpPtr->htype = 1;
+    dhcpPtr->hlen = 6;
+    dhcpPtr->hops = 0;
+    // 4-7 xid
+    memcpy(&dhcpPtr->xid, &currentXid, sizeof(currentXid));
+    // 8-9 secs
+    memcpy(&dhcpPtr->secs, &currentSecs, sizeof(currentSecs));
+    // 16-19 yiaddr
+    memset(dhcpPtr->yiaddr, 0, 4);
+    // 28-43 chaddr(16)
+    memcpy(dhcpPtr->chaddr, macaddr, 6);
+
+    // options defined as option, length, value
+    bufPtr = buf + UDP_DATA_P + sizeof(dhcpData);
+    // Magic cookie 99, 130, 83 and 99
+    addToBuf(99);
+    addToBuf(130);
+    addToBuf(83);
+    addToBuf(99);
+
+    // Set correct options
+    // Option 1 - DHCP message type
+    addToBuf(53);           // DHCPDISCOVER, DHCPREQUEST
+    addToBuf(1);            // Length
+    addToBuf(DHCPREQUEST);  // Value
+
+    // Client Identifier Option, this is the client mac address
+    addToBuf(61);    // Client identifier
+    addToBuf(7);     // Length
+    addToBuf(0x01);  // Value
+    for (i = 0; i < 6; i++) addToBuf(macaddr[i]);
+
+    // Host name Option
+    addToBuf(12);             // Host name
+    addToBuf(HOSTNAME_SIZE);  // Length
+    for (i = 0; i < HOSTNAME_SIZE; i++) addToBuf(hostname[i]);
+
+    if (requestType == DHCPREQUEST) {
+        // Request IP address
+        addToBuf(50);  // Requested IP address
+        addToBuf(4);   // Length
+        for (i = 0; i < 4; i++) addToBuf(dhcpip[i]);
+
+        // Request using server ip address
+        addToBuf(54);  // Server IP address
+        addToBuf(4);   // Length
+        for (i = 0; i < 4; i++) addToBuf(dhcpserver[i]);
+    }
+
+    // Additional information in parameter list - minimal list for what we need
+    addToBuf(55);  // Parameter request list
+    addToBuf(3);   // Length
+    addToBuf(1);   // Subnet mask
+    addToBuf(3);   // Route/Gateway
+    addToBuf(6);   // DNS Server
+
+    // payload len should be around 300
+    addToBuf(255);  // end option
+    send_udp_transmit(buf, bufPtr - buf - UDP_DATA_P);
+}
+
 // Examine packet, if dhcp then process, if just exit.
 // Perform lease expiry checks and initiate renewal
 // process the answer from the dhcp server:
