@@ -37,7 +37,7 @@ struct cmd_description {
     cmdFunc proc;
 };
 
-void cmd_process(char * cmd);
+void cmd_process(char * cmd, uint8_t len);
 
 #endif // __CMD_H__
 

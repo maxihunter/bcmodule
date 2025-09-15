@@ -24,13 +24,25 @@
 #include "cmd.h"
 #include "inttypes.h"
 #include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+
+extern struct inet_addr net_addr;
 
 static void print_help(char *cmd);
+static void print_version(char *cmd);
 
-struct cmd_description cmd_list[] = {
-    {"ver", 0, "Print Version", NULL},
+const struct cmd_description cmd_list[] = {
+    {"ver", 0, "Print Version", &print_version},
     {"help", 1, "Print help", &print_help},
-    {NULL, -1, NULL, NULL},
+    {"usb", 2, "USB on/off", &print_help},
+    {"ftp", 3, "FTP on/off", &print_help},
+    {"link", 4, "Eth Link up/down", &print_help},
+    {"sd_st", 5, "SD status", &print_help},
+    {"con1", 6, "CON1 on/off", &print_help},
+    {"con2", 7, "CON2 on/off", &print_help},
+    {"con3", 8, "CON3 on/off", &print_help},
+    {NULL, 255, NULL, NULL},
 };
 /*{
     char * name;
@@ -40,14 +52,42 @@ struct cmd_description cmd_list[] = {
 }*/
 
 
-void cmd_process(char * cmd) {
+void cmd_process(char * cmd, uint8_t len) {
+    char *cmd_ptr = cmd;
+    for (int k = 0; k < len; k++) {
+        if (cmd_ptr+k == ' ') {
+            cmd_ptr += k;
+            *cmd_ptr = '\0';
+            break;
+        }
+    }
+    uint8_t found = 0;
+    for (int i = 0; cmd_list[i].id != 255; i++) {
+        //printf("coll id=%d %s\r\n",i, cmd);
+        if (strcmp(cmd_list[i].name, cmd) == 0) {
+            printf("coll id=%d\r\n",i);
+            if (cmd_ptr == cmd)
+                (cmd_list[i].proc)(NULL);
+            else
+                (cmd_list[i].proc)(cmd_ptr);
+            found = 1;
+            break;
+        }
+    }
+    if (!found) {
+        printf("Unknown cmd\r\n");
+    }
 }
 
-static void print_help(char *cmd) {
+void print_help(char *cmd) {
     uint8_t cmd_id = 0;
-    while (cmd_list[cmd_id].id != -1) {
+    while (cmd_list[cmd_id].id != 255) {
         printf("  %s - %s\r\n", cmd_list[cmd_id].name, cmd_list[cmd_id].desc);
         cmd_id++;
     }
+}
+
+void print_version(char *cmd) {
+    printf("sw version: %d\r\n", SW_VER);
 }
 

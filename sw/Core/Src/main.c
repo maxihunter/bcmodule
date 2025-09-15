@@ -96,10 +96,12 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
     if (huart->Instance == USART1) {
         HAL_UART_Transmit(huart, inbuff, 1, 100);
         if (inbuff[0] == 0x0d) { // enter
-            cmd_process(cmd);
+            HAL_UART_Transmit(huart, "\n", 1, 100);
+            HAL_UART_Transmit(huart, cmd, cmd_ptr, 100);
+            cmd_process(cmd, cmd_ptr);
             memset(cmd, 0, 256);
             cmd_ptr = 0;
-            HAL_UART_Transmit(huart, "\n", 1, 100);
+            HAL_UART_Transmit(huart, "--#> ", 6, HAL_MAX_DELAY);
         }
         cmd[cmd_ptr] = inbuff[0];
         cmd_ptr++;
@@ -158,7 +160,7 @@ int main(void)
   }
   
   enc28j60_set_spi(&hspi2);
-  enc28j60Init(mac);
+  //enc28j60Init(mac);
   printf("Network OK\r\n");
   //enc28j60DisableBroadcast();
   //enc28j60DisableMulticast();
@@ -174,7 +176,7 @@ int main(void)
   printf("Getting IP from DHCP... (%x:%x:%x:%x:%x:%x)\r\n", 
           net_addr.macaddr[0], net_addr.macaddr[1], net_addr.macaddr[2], net_addr.macaddr[3],
           net_addr.macaddr[4], net_addr.macaddr[5]);
-  initDhcp(&net_addr);
+  //initDhcp(&net_addr);
   printf(
           "\tIP address: %d.%d.%d.%d\r\n"
           "\tIP netmask: %d.%d.%d.%d\r\n"
