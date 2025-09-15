@@ -28,6 +28,7 @@
 #include "net.h"
 #include <stdio.h>
 #include <string.h>
+#include "cmd.h"
 
 /* USER CODE END Includes */
 
@@ -43,7 +44,6 @@
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-#define SW_VER 1
 
 /* USER CODE END PM */
 
@@ -59,6 +59,9 @@ PCD_HandleTypeDef hpcd_USB_FS;
 struct inet_addr net_addr = {0};
 static const uint8_t mac[] = {0xD2, 0x18, 0XBB, 0x55, 0x66, 0x77};
 static long lastDhcpRequest = 0;
+static char inbuff[10] = {0};
+static char cmd[256] = {0};
+static uint8_t cmd_ptr = 0;
 
 /* USER CODE END PV */
 
@@ -88,7 +91,22 @@ int _write(int file, char *ptr, int len)
     }
     return -1;
 }
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+    if (huart->Instance == USART1) {
+        HAL_UART_Transmit(huart, inbuff, 1, 100);
+        if (inbuff[0] == 0x0d) { // enter
+            cmd_process(cmd);
+            memset(cmd, 0, 256);
+            cmd_ptr = 0;
+            HAL_UART_Transmit(huart, "\n", 1, 100);
+        }
+        cmd[cmd_ptr] = inbuff[0];
+        cmd_ptr++;
 
+        HAL_UART_Receive_IT(huart, inbuff, 1);
+    }
+}
 /* USER CODE END 0 */
 
 /**
@@ -167,7 +185,8 @@ int main(void)
           net_addr.gateway[0], net_addr.gateway[1], net_addr.gateway[2], net_addr.gateway[3], 
           net_addr.dnssrv[0], net_addr.dnssrv[1], net_addr.dnssrv[2], net_addr.dnssrv[3] 
           );
-
+  HAL_UART_Transmit(&huart1, "--#> ", 5, HAL_MAX_DELAY);
+  HAL_UART_Receive_IT(&huart1, inbuff, 1);
   /* USER CODE END 2 */
 
   /* Infinite loop */
