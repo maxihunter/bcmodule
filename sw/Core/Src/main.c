@@ -24,9 +24,10 @@
 /* USER CODE BEGIN Includes */
 #include "enc28j60.h"
 #include "iplayer.h"
-#include "dhcp.h"
+#include "dhcpd.h"
 #include "net.h"
 #include <stdio.h>
+#include <string.h>
 
 /* USER CODE END Includes */
 
@@ -43,7 +44,6 @@
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
 #define SW_VER 1
-#define PBUFF_LEN 400
 
 /* USER CODE END PM */
 
@@ -56,14 +56,8 @@ UART_HandleTypeDef huart1;
 PCD_HandleTypeDef hpcd_USB_FS;
 
 /* USER CODE BEGIN PV */
-
+struct inet_addr net_addr = {0};
 static const uint8_t mac[] = {0xD2, 0x18, 0XBB, 0x55, 0x66, 0x77};
-static uint8_t pbuf[PBUFF_LEN] = {};
-static uint8_t ipaddrin[4] = {};
-static uint8_t maskin[4] = {};
-static uint8_t gwipin[4] = {};
-static uint8_t dhcpsvrin[4] = {};
-static uint8_t dnssvrin[4] = {};
 static long lastDhcpRequest = 0;
 
 /* USER CODE END PV */
@@ -158,16 +152,20 @@ int main(void)
   enc28j60PacketSend(40, bbuff);*/
 
   lastDhcpRequest = HAL_GetTick();
-  initDhcp(pbuf, PBUFF_LEN, mac, ipaddrin, maskin, gwipin, dhcpsvrin, dnssvrin);
+  memcpy(net_addr.macaddr, mac, 6);
+  printf("Getting IP from DHCP... (%x:%x:%x:%x:%x:%x)\r\n", 
+          net_addr.macaddr[0], net_addr.macaddr[1], net_addr.macaddr[2], net_addr.macaddr[3],
+          net_addr.macaddr[4], net_addr.macaddr[5]);
+  initDhcp(&net_addr);
   printf(
           "\tIP address: %d.%d.%d.%d\r\n"
           "\tIP netmask: %d.%d.%d.%d\r\n"
           "\tGW address: %d.%d.%d.%d\r\n"
           "\tDNS address: %d.%d.%d.%d\r\n",
-          ipaddrin[0], ipaddrin[1], ipaddrin[2], ipaddrin[3],
-          maskin[0], maskin[1], maskin[2], maskin[3], 
-          gwipin[0], gwipin[1], gwipin[2], gwipin[3], 
-          dnssvrin[0], dnssvrin[1], dnssvrin[2], dnssvrin[3] 
+          net_addr.ipaddr[0], net_addr.ipaddr[1], net_addr.ipaddr[2], net_addr.ipaddr[3],
+          net_addr.mask[0], net_addr.mask[1], net_addr.mask[2], net_addr.mask[3], 
+          net_addr.gateway[0], net_addr.gateway[1], net_addr.gateway[2], net_addr.gateway[3], 
+          net_addr.dnssrv[0], net_addr.dnssrv[1], net_addr.dnssrv[2], net_addr.dnssrv[3] 
           );
 
   /* USER CODE END 2 */

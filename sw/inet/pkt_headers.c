@@ -23,15 +23,15 @@
 
 #include "pkt_headers.h"
 
-void extract_eth_header(uin8_t* buff, struct eth_header* ethd) {
+void extract_eth_header(uint8_t* buff, struct eth_header* ethd) {
 	memcpy((uint8_t*)ethd, buff, sizeof(struct eth_header));
 }
 
-void extract_ip_header(uin8_t* buff, struct ip_header* iphd) {
+void extract_ip_header(uint8_t* buff, struct ip_header* iphd) {
 	memcpy((uint8_t*)iphd, buff+sizeof(struct eth_header), sizeof(struct ip_header));
 }
 
-uin8_t* get_pkt_data(uin8_t* buff, const struct ip_header* iphd) {
+uint8_t* get_pkt_data(uint8_t* buff, const struct ip_header* iphd) {
 	if (IP_HDR_GET_IHL(iphd->version_ihl) == 5) {
 		return buff + sizeof(struct eth_header) + sizeof(struct ip_header);
 	}

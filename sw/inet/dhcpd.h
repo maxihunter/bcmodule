@@ -37,10 +37,11 @@ struct inet_addr {
     uint8_t ipaddr[4];
     uint8_t mask[4];
     uint8_t gateway[4];
-    uint8_t dhcpsvr[4];
-    uint8_t dnssvr[4];
+    uint8_t dhcpsrv[4];
+    uint8_t dnssrv[4];
     uint32_t dncp_lease_time;
-} inet_addr_t;
+    long dncp_last_lease;
+};
 
 extern void dhcp_start(uint8_t* buf, struct inet_addr * inaddr);
 

@@ -66,8 +66,11 @@ Core/Src/sysmem.c \
 Core/Src/syscalls.c \
 enc28j60/src/enc28j60.c \
 enc28j60/src/ip_arp_udp_tcp.c \
-enc28j60/src/iplayer.c \
-enc28j60/src/dhcp.c
+inet/iplayer.c \
+inet/pkt_headers.c \
+inet/dhcpd.c
+
+#enc28j60/src/dhcp.c
 
 # ASM sources
 ASM_SOURCES =  \
@@ -140,6 +143,7 @@ C_INCLUDES =  \
 -IDrivers/CMSIS/Device/ST/STM32F1xx/Include \
 -IDrivers/CMSIS/Include \
 -Isd \
+-Iinet \
 -Ienc28j60/inc/
 
 

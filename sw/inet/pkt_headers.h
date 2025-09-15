@@ -25,6 +25,7 @@
 #ifndef __PKT_HEADERS_H__
 #define __PKT_HEADERS_H__
 
+#include <inttypes.h>
 // EtherTypes
 
 #define ETHERTYPE_IPV4 0x0800	//Internet Protocol version 4 (IPv4)
@@ -176,8 +177,8 @@ struct eth_header {
 	uint16_t ethertype;
 };
 
-#define IP_HDR_GET_VERS(x) { x >> 4 }
-#define IP_HDR_GET_IHL(x) { x & 0x0f }
+#define IP_HDR_GET_VERS(x) ( x >> 4 )
+#define IP_HDR_GET_IHL(x) ( x & 0x0f )
 
 struct ip_header {
 	uint8_t version_ihl;
@@ -198,12 +199,11 @@ struct ip_opts {
 	uint8_t *opt_data;
 	uint16_t id;
 	uint16_t frag_offset;
-}
+};
 
-
-inline void extract_eth_header(uin8_t* buff, struct eth_header* ethd);
-inline void extract_ip_header(uin8_t* buff, struct ip_header* iphd);
-inline uin8_t* get_pkt_data(uin8_t* buff, const struct ip_header* iphd);
+inline void extract_eth_header(uint8_t* buff, struct eth_header* ethd);
+inline void extract_ip_header(uint8_t* buff, struct ip_header* iphd);
+inline uint8_t* get_pkt_data(uint8_t* buff, const struct ip_header* iphd);
 
 
 #endif // __PKT_HEADERS_H__
