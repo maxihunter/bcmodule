@@ -175,7 +175,7 @@ struct eth_header {
 	uint8_t src_mac[6];
 	uint8_t tag[4];
 	uint16_t ethertype;
-};
+} __attribute__((packed));
 
 #define IP_HDR_GET_VERS(x) ( x >> 4 )
 #define IP_HDR_GET_IHL(x) ( x & 0x0f )
@@ -191,7 +191,7 @@ struct ip_header {
 	uint16_t checksum;
 	uint32_t src_ip;
 	uint32_t dst_ip;
-};
+} __attribute__((packed));
 
 struct ip_opts {
 	uint8_t opt_type;
@@ -199,11 +199,24 @@ struct ip_opts {
 	uint8_t *opt_data;
 	uint16_t id;
 	uint16_t frag_offset;
-};
+} __attribute__((packed));
+
+struct tcpip_header {
+	uint16_t sport;
+	uint16_t dport;
+	uint32_t sequence;
+	uint32_t ack_num;
+	uint16_t flags;
+	uint16_t window;
+	uint16_t checksum;
+	uint16_t urgent_ptr;
+}__attribute__((packed));
 
 inline void extract_eth_header(uint8_t* buff, struct eth_header* ethd);
 inline void extract_ip_header(uint8_t* buff, struct ip_header* iphd);
+inline struct eth_header* map_eth_header(uint8_t* buff);
+inline struct ip_header* map_ip_header(uint8_t* buff);
 inline uint8_t* get_pkt_data(uint8_t* buff, const struct ip_header* iphd);
 
-
 #endif // __PKT_HEADERS_H__
+

@@ -28,6 +28,7 @@
 #include "net.h"
 #include <stdio.h>
 #include <string.h>
+#include "cmd.h"
 
 /* USER CODE END Includes */
 
@@ -38,12 +39,11 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define CMD_MAX_LEN 64
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-#define SW_VER 1
 
 /* USER CODE END PM */
 
@@ -59,6 +59,9 @@ PCD_HandleTypeDef hpcd_USB_FS;
 struct inet_addr net_addr = {0};
 static const uint8_t mac[] = {0xD2, 0x18, 0XBB, 0x55, 0x66, 0x77};
 static long lastDhcpRequest = 0;
+static char inbuff[10] = {0};
+static char cmd[CMD_MAX_LEN] = {0};
+static uint8_t cmd_ptr = 0;
 
 /* USER CODE END PV */
 
@@ -88,7 +91,27 @@ int _write(int file, char *ptr, int len)
     }
     return -1;
 }
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+    if (huart->Instance == USART1) {
+        HAL_UART_Transmit(huart, inbuff, 1, 100);
+        if (inbuff[0] == 0x0d) { // enter
+            HAL_UART_Transmit(huart, "\n", 1, 100);
+            //HAL_UART_Transmit(huart, cmd, cmd_ptr, 100);
+            cmd_process(cmd, cmd_ptr);
+            memset(cmd, 0, 256);
+            cmd_ptr = 0;
+            HAL_UART_Transmit(huart, "--#> ", 6, HAL_MAX_DELAY);
+        } else {
+            //printf("GOT KEY=%x (len=%d)\n\r",inbuff[0], cmd_ptr);
+            cmd[cmd_ptr] = inbuff[0];
+			if (cmd_ptr < CMD_MAX_LEN-1)
+				cmd_ptr++;
+        }
 
+        HAL_UART_Receive_IT(huart, inbuff, 1);
+    }
+}
 /* USER CODE END 0 */
 
 /**
@@ -140,7 +163,7 @@ int main(void)
   }
   
   enc28j60_set_spi(&hspi2);
-  enc28j60Init(mac);
+  //enc28j60Init(mac);
   printf("Network OK\r\n");
   //enc28j60DisableBroadcast();
   //enc28j60DisableMulticast();
@@ -156,7 +179,7 @@ int main(void)
   printf("Getting IP from DHCP... (%x:%x:%x:%x:%x:%x)\r\n", 
           net_addr.macaddr[0], net_addr.macaddr[1], net_addr.macaddr[2], net_addr.macaddr[3],
           net_addr.macaddr[4], net_addr.macaddr[5]);
-  initDhcp(&net_addr);
+  //initDhcp(&net_addr);
   printf(
           "\tIP address: %d.%d.%d.%d\r\n"
           "\tIP netmask: %d.%d.%d.%d\r\n"
@@ -167,7 +190,8 @@ int main(void)
           net_addr.gateway[0], net_addr.gateway[1], net_addr.gateway[2], net_addr.gateway[3], 
           net_addr.dnssrv[0], net_addr.dnssrv[1], net_addr.dnssrv[2], net_addr.dnssrv[3] 
           );
-
+  HAL_UART_Transmit(&huart1, "--#> ", 5, HAL_MAX_DELAY);
+  HAL_UART_Receive_IT(&huart1, inbuff, 1);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -396,7 +420,7 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4|GPIO_PIN_8, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : PC13 */
   GPIO_InitStruct.Pin = GPIO_PIN_13;
@@ -404,6 +428,13 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PA4 */
+  GPIO_InitStruct.Pin = GPIO_PIN_4;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /*Configure GPIO pin : PA8 */
   GPIO_InitStruct.Pin = GPIO_PIN_8;

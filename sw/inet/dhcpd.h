@@ -25,6 +25,7 @@
 #define __DHCP_H__
 
 #include <stdint.h>
+#include "iplayer.h"
 
 #define DHCP_HOSTNAME "stm32bcmod"
 #define DHCP_HOSTNAME_LEN 10
@@ -32,25 +33,20 @@
 #define DHCP_BOOTREQUEST 1
 #define DHCP_BOOTRESPONSE 2
 
-struct inet_addr {
-    uint8_t macaddr[6];
-    uint8_t ipaddr[4];
-    uint8_t mask[4];
-    uint8_t gateway[4];
-    uint8_t dhcpsrv[4];
-    uint8_t dnssrv[4];
-    uint32_t dncp_lease_time;
-    long dncp_last_lease;
-};
+/* DHCP */
+uint8_t initDhcp(struct inet_addr *addr );
+uint8_t renewDhcp(struct inet_addr *addr);
+uint8_t releaseDhcp(struct inet_addr *addr);
 
-extern void dhcp_start(uint8_t* buf, struct inet_addr * inaddr);
+extern void dhcp_start(uint8_t* buf, uint32_t len, struct inet_addr * inaddr);
 
 extern uint8_t dhcp_state(void);
 
-uint8_t check_for_dhcp_answer(uint8_t* buf, uint16_t plen);
+uint8_t check_for_dhcp_answer(uint8_t* buf, uint32_t len, uint16_t plen);
 
-uint8_t have_dhcpoffer(uint8_t* buf, uint16_t plen);
-uint8_t have_dhcpack(uint8_t* buf, uint16_t plen);
+uint8_t have_dhcpoffer(uint8_t* buf, uint32_t len, uint16_t plen);
+uint8_t have_dhcpack(uint8_t* buf, uint32_t len, uint16_t plen);
+uint8_t dhcpRenew();
 
 #endif // __DHCP_H__
 

@@ -21,28 +21,23 @@
  * THE SOFTWARE.
  */
 
-#include "pkt_headers.h"
-#include <string.h>
+#ifndef __CMD_H__
+#define __CMD_H__
 
-inline void extract_eth_header(uint8_t* buff, struct eth_header* ethd) {
-	memcpy((uint8_t*)ethd, buff, sizeof(struct eth_header));
-}
+#include <stdint.h>
 
-inline void extract_ip_header(uint8_t* buff, struct ip_header* iphd) {
-	memcpy((uint8_t*)iphd, buff+sizeof(struct eth_header), sizeof(struct ip_header));
-}
+#define SW_VER 1
 
-inline struct eth_header* map_eth_header(uint8_t* buff) {
-    return (struct eth_header*)buff;
-}
+typedef void (*cmdFunc) (char * arg);
 
-inline struct ip_header* map_ip_header(uint8_t* buff) {
-    return (struct ip_header*)(buff+sizeof(struct eth_header));
-}
+struct cmd_description {
+    char * name;
+    uint8_t id;
+    char * desc;
+    cmdFunc proc;
+};
 
-uint8_t* get_pkt_data(uint8_t* buff, const struct ip_header* iphd) {
-	if (IP_HDR_GET_IHL(iphd->version_ihl) == 5) {
-		return buff + sizeof(struct eth_header) + sizeof(struct ip_header);
-	}
-	return buff;
-}
+void cmd_process(char * cmd, uint8_t len);
+
+#endif // __CMD_H__
+

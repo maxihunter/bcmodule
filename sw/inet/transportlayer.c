@@ -21,28 +21,28 @@
  * THE SOFTWARE.
  */
 
+#include "net.h"
+#include "transportlayer.h"
+#include "iplayer.h"
 #include "pkt_headers.h"
+#include "enc28j60.h"
+#include "dhcpd.h"
+#include <inttypes.h>
+#include <stdbool.h>
 #include <string.h>
 
-inline void extract_eth_header(uint8_t* buff, struct eth_header* ethd) {
-	memcpy((uint8_t*)ethd, buff, sizeof(struct eth_header));
+static struct inet_addr *int_addr = NULL;
+static struct socket socks[] = {
+    {20, IP_PROTO_TYPE_TCP, SOCK_OPEN },
+    {21, IP_PROTO_TYPE_TCP, SOCK_OPEN },
+    {65535, 0, 0 } // EMPTY
+};
+
+
+
+uint8_t socketRoutine(uint8_t *buff, uint32_t len) {
+    if (len < 60)
+        return 0;
+    return 0;
 }
 
-inline void extract_ip_header(uint8_t* buff, struct ip_header* iphd) {
-	memcpy((uint8_t*)iphd, buff+sizeof(struct eth_header), sizeof(struct ip_header));
-}
-
-inline struct eth_header* map_eth_header(uint8_t* buff) {
-    return (struct eth_header*)buff;
-}
-
-inline struct ip_header* map_ip_header(uint8_t* buff) {
-    return (struct ip_header*)(buff+sizeof(struct eth_header));
-}
-
-uint8_t* get_pkt_data(uint8_t* buff, const struct ip_header* iphd) {
-	if (IP_HDR_GET_IHL(iphd->version_ihl) == 5) {
-		return buff + sizeof(struct eth_header) + sizeof(struct ip_header);
-	}
-	return buff;
-}
