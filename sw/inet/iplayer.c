@@ -30,7 +30,10 @@
 #define PBUFF_LEN 400
 static uint8_t pbuf[PBUFF_LEN] = {};
 
+static struct inet_addr *int_addr = NULL;
+
 uint8_t initDhcp(struct inet_addr *addr ) {
+  int_addr = addr;
   int plen = 0;
   uint8_t dhcpState = 0;
   long lastDhcpRequest = HAL_GetTick();
@@ -65,4 +68,89 @@ uint8_t initDhcp(struct inet_addr *addr ) {
 
 uint8_t renewDhcp(struct inet_addr *addr) {
     return dhcp_check_for_renew();
+}
+
+uint8_t isHostInLocalNetwork(uint8_t *hostaddr) {
+	uint8_t oct1 = int_addr->mask[0]&hostaddr[0];
+	uint8_t oct2 = int_addr->mask[1]&hostaddr[1];
+	uint8_t oct3 = int_addr->mask[2]&hostaddr[2];
+	uint8_t oct4 = int_addr->mask[3]&hostaddr[3];
+	return ( ((int_addr->mask[0]&int_addr->ipaddr[0]) == oct1) && 
+			((int_addr->mask[1]&int_addr->ipaddr[1]) == oct2) && 
+			((int_addr->mask[2]&int_addr->ipaddr[2]) == oct3) && 
+			((int_addr->mask[3]&int_addr->ipaddr[3]) == oct4) );
+}
+
+uint8_t arpCheckAndReply(uint8_t *buff, uint32_t len) {
+	if (len<41){
+		return(0);
+	}
+	if(buf[ETH_TYPE_H_P] != ETHTYPE_ARP_H_V || 
+		buf[ETH_TYPE_L_P] != ETHTYPE_ARP_L_V){
+			return(0);
+	}
+  
+	if (memcmp(&buf[ETH_ARP_DST_IP_P], ipaddr, 4)) {
+		return 0;
+	}
+	if (buf[ETH_ARP_OPCODE_L_P] != ETH_ARP_OPCODE_REQ_L_V) {
+		return 0;
+	}
+	make_eth(buf);
+	buf[ETH_ARP_OPCODE_H_P]=ETH_ARP_OPCODE_REPLY_H_V;
+	buf[ETH_ARP_OPCODE_L_P]=ETH_ARP_OPCODE_REPLY_L_V;
+	// fill the mac addresses:
+	memcpy(&buf[ETH_ARP_DST_MAC_P], &buf[ETH_ARP_SRC_MAC_P], 6);
+	memcpy(&buf[ETH_ARP_SRC_MAC_P], int_addr->macaddr, 6);
+	// fill the ip addresses
+	memcpy(&buf[ETH_ARP_DST_IP_P], &buf[ETH_ARP_SRC_IP_P], 4);
+	memcpy(&buf[ETH_ARP_SRC_IP_P], int_addr->ipaddr, 4);
+	// eth+arp is 42 bytes:
+	enc28j60PacketSend(42,buf);
+	return 1;
+}
+
+
+uint8_t icmpCheckAndReply(uint8_t *buff, uint32_t len) {
+	if (len<41){
+		return 0;
+	}
+	if(buf[ETH_TYPE_H_P] != ETHTYPE_ARP_H_V || 
+		buf[ETH_TYPE_L_P] != ETHTYPE_ARP_L_V){
+			return 0;
+	}
+  
+	if (memcmp(&buf[ETH_ARP_DST_IP_P], ipaddr, 4)) {
+		return 0;
+	}
+	if (buf[ETH_ARP_OPCODE_L_P] != ETH_ARP_OPCODE_REQ_L_V) {
+		return 0;
+	}
+	make_eth(buf);
+	buf[ETH_ARP_OPCODE_H_P]=ETH_ARP_OPCODE_REPLY_H_V;
+	buf[ETH_ARP_OPCODE_L_P]=ETH_ARP_OPCODE_REPLY_L_V;
+	
+	memcpy(&buf[ETH_ARP_DST_MAC_P], &buf[ETH_ARP_SRC_MAC_P], 6);
+	memcpy(&buf[ETH_ARP_SRC_MAC_P], int_addr->macaddr, 6);
+	
+	memcpy(&buf[ETH_ARP_DST_IP_P], &buf[ETH_ARP_SRC_IP_P], 4);
+	memcpy(&buf[ETH_ARP_SRC_IP_P], int_addr->ipaddr, 4);
+	
+	enc28j60PacketSend(42,buf);
+	return 1;
+}
+
+void make_echo_reply_from_request(uint8_t *buf,uint16_t len) {
+	if (len<42){
+		return 0;
+	}
+	if( buf[IP_PROTO_P] != IP_PROTO_ICMP_V) {
+		return 0;
+	}
+	if ( buf[ICMP_TYPE_P] != ICMP_TYPE_ECHOREQUEST_V) {
+		return 0;
+	}
+	if (memcmp(&buf[IP_DST_P], ipaddr, 4)) {
+		return 0;
+	}
 }

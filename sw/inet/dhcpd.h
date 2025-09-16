@@ -37,6 +37,7 @@ struct inet_addr {
     uint8_t ipaddr[4];
     uint8_t mask[4];
     uint8_t gateway[4];
+	uint8_t gw_macaddr[6];
     uint8_t dhcpsrv[4];
     uint8_t dnssrv[4];
     uint32_t dncp_lease_time;
