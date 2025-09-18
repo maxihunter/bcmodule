@@ -22,13 +22,22 @@
  */
 
 #include "pkt_headers.h"
+#include <string.h>
 
-void extract_eth_header(uint8_t* buff, struct eth_header* ethd) {
+inline void extract_eth_header(uint8_t* buff, struct eth_header* ethd) {
 	memcpy((uint8_t*)ethd, buff, sizeof(struct eth_header));
 }
 
-void extract_ip_header(uint8_t* buff, struct ip_header* iphd) {
+inline void extract_ip_header(uint8_t* buff, struct ip_header* iphd) {
 	memcpy((uint8_t*)iphd, buff+sizeof(struct eth_header), sizeof(struct ip_header));
+}
+
+inline struct eth_header* map_eth_header(uint8_t* buff) {
+    return (struct eth_header*)buff;
+}
+
+inline struct ip_header* map_ip_header(uint8_t* buff) {
+    return (struct ip_header*)(buff+sizeof(struct eth_header));
 }
 
 uint8_t* get_pkt_data(uint8_t* buff, const struct ip_header* iphd) {

@@ -55,7 +55,7 @@ const struct cmd_description cmd_list[] = {
 void cmd_process(char * cmd, uint8_t len) {
     char *cmd_ptr = cmd;
     for (int k = 0; k < len; k++) {
-        if (cmd_ptr+k == ' ') {
+        if (*(cmd_ptr+k) == ' ') {
             cmd_ptr += k;
             *cmd_ptr = '\0';
             break;
@@ -63,9 +63,9 @@ void cmd_process(char * cmd, uint8_t len) {
     }
     uint8_t found = 0;
     for (int i = 0; cmd_list[i].id != 255; i++) {
-        //printf("coll id=%d %s\r\n",i, cmd);
+        //printf("coll id=%d %s(%d)\r\n",i, cmd, len);
         if (strcmp(cmd_list[i].name, cmd) == 0) {
-            printf("coll id=%d\r\n",i);
+            //printf("coll id=%d\r\n",i);
             if (cmd_ptr == cmd)
                 (cmd_list[i].proc)(NULL);
             else

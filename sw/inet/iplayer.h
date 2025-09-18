@@ -26,6 +26,22 @@
 
 #include "dhcpd.h"
 
+enum {
+    SOCK_OPEN,
+    SOCK_CLOSED,
+    SOCK_LISTEN,
+    SOCK_SYN,
+    SOCK_SYNACK,
+    SOCK_ESTABLISHED,
+    SOCK_FIN
+};
+
+struct socket {
+    uint16_t port;
+    uint8_t protocol;
+    uint8_t state;
+};
+
 /* DHCP */
 uint8_t initDhcp(struct inet_addr *addr );
 uint8_t renewDhcp(struct inet_addr *addr);
@@ -36,5 +52,8 @@ inline uint8_t isHostInLocalNetwork(uint8_t *hostaddr);
 
 /* ARP */
 uint8_t arpCheckAndReply(uint8_t *buff, uint32_t len);
+
+/* SOCK */
+uint8_t checkForSocket(uint8_t *buff, uint32_t len);
 
 #endif

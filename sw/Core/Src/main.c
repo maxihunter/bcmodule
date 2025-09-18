@@ -97,14 +97,16 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
         HAL_UART_Transmit(huart, inbuff, 1, 100);
         if (inbuff[0] == 0x0d) { // enter
             HAL_UART_Transmit(huart, "\n", 1, 100);
-            HAL_UART_Transmit(huart, cmd, cmd_ptr, 100);
+            //HAL_UART_Transmit(huart, cmd, cmd_ptr, 100);
             cmd_process(cmd, cmd_ptr);
             memset(cmd, 0, 256);
             cmd_ptr = 0;
             HAL_UART_Transmit(huart, "--#> ", 6, HAL_MAX_DELAY);
+        } else {
+            //printf("GOT KEY=%x (len=%d)\n\r",inbuff[0], cmd_ptr);
+            cmd[cmd_ptr] = inbuff[0];
+            cmd_ptr++;
         }
-        cmd[cmd_ptr] = inbuff[0];
-        cmd_ptr++;
 
         HAL_UART_Receive_IT(huart, inbuff, 1);
     }
@@ -417,7 +419,7 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4|GPIO_PIN_8, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : PC13 */
   GPIO_InitStruct.Pin = GPIO_PIN_13;
@@ -425,6 +427,13 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PA4 */
+  GPIO_InitStruct.Pin = GPIO_PIN_4;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /*Configure GPIO pin : PA8 */
   GPIO_InitStruct.Pin = GPIO_PIN_8;
