@@ -39,7 +39,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define CMD_MAX_LEN 64
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -60,7 +60,7 @@ struct inet_addr net_addr = {0};
 static const uint8_t mac[] = {0xD2, 0x18, 0XBB, 0x55, 0x66, 0x77};
 static long lastDhcpRequest = 0;
 static char inbuff[10] = {0};
-static char cmd[256] = {0};
+static char cmd[CMD_MAX_LEN] = {0};
 static uint8_t cmd_ptr = 0;
 
 /* USER CODE END PV */
@@ -105,7 +105,8 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
         } else {
             //printf("GOT KEY=%x (len=%d)\n\r",inbuff[0], cmd_ptr);
             cmd[cmd_ptr] = inbuff[0];
-            cmd_ptr++;
+			if (cmd_ptr < CMD_MAX_LEN-1)
+				cmd_ptr++;
         }
 
         HAL_UART_Receive_IT(huart, inbuff, 1);

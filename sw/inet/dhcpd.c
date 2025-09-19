@@ -29,7 +29,7 @@
 #include "ip_arp_udp_tcp.h"
 #include "net.h"
 
-static void dhcp_send(uint8_t* buf, uint8_t requestType);
+static void dhcp_send_packet(uint8_t* buf, uint32_t len, uint8_t requestType);
 
 #define DHCP_BOOTREQUEST 1
 #define DHCP_BOOTREPLY 2
@@ -40,28 +40,29 @@ static void dhcp_send(uint8_t* buf, uint8_t requestType);
  //#define DHCPNACK
 
  // size 236
-typedef struct dhcpData {
+struct dhcp_data {
     // 0-3 op, htype, hlen, hops
     uint8_t op;
     uint8_t htype;
     uint8_t hlen;
     uint8_t hops;
-    // 4-7 xid
     uint32_t xid;
-    // 8-9 secs
     uint16_t secs;
-    // 10-11 flags
     uint16_t flags;
-    // 12-15 ciaddr
-    uint8_t ciaddr[4];
+    uint32_t ciaddr;
+	//uint8_t ciaddr[4];
     // 16-19 yiaddr
-    uint8_t yiaddr[4];
+    uint32_t yiaddr;
+	//uint8_t yiaddr[4];
     // 20-23 siaddr
-    uint8_t siaddr[4];
+    uint32_t siaddr;
+	//uint8_t siaddr[4];
     // 24-27 giaddr
-    uint8_t giaddr[4];
+    uint32_t giaddr;
+	//uint8_t giaddr[4];
     // 28-43 chaddr(16)
-    uint8_t chaddr[16];
+    uint32_t chaddr;
+	//uint8_t chaddr[16];
     // 44-107 sname (64)
     uint8_t sname[64];
     // 108-235 file(128)
@@ -69,7 +70,7 @@ typedef struct dhcpData {
     // options
     // dont include as its variable size,
     // just tag onto end of structure
-} __attribute__((packed)) dhcpData;
+} __attribute__((packed));
 
 static uint8_t dhcptid_l = 0;  // a counter for transaction ID
 // src port high byte must be a a0 or higher:
@@ -79,10 +80,8 @@ static uint8_t dhcptid_l = 0;  // a counter for transaction ID
 
 static uint8_t dhcpState = DHCP_STATE_INIT;
 
-// Pointers to values we have set or need to set
 static struct inet_addr * int_addr = NULL;
 
-// For DHCP hostnames we don't need any zero-terminators
 #define HOSTNAME_LEN DHCP_HOSTNAME_LEN
 #define HOSTNAME_SIZE HOSTNAME_LEN + 3
 
@@ -95,7 +94,7 @@ static long leaseStart = 0;
 static uint32_t leaseTime = 0;
 static uint8_t* bufPtr = NULL;
 
-static void addToBuf(uint8_t b) { *bufPtr++ = b; }
+inline void addToBuf(uint8_t b) { *bufPtr++ = b; };
 
 uint8_t dhcp_state(void) {
     // Check lease and request renew if currently OK and time
@@ -114,7 +113,7 @@ uint8_t dhcp_state(void) {
 // Send DHCPREQUEST
 // Wait for DHCPACK
 // All configured
-extern void dhcp_start(uint8_t* buf, struct inet_addr * inaddr) {
+extern void dhcp_start(uint8_t* buf, uint32_t len, struct inet_addr * inaddr) {
     int_addr = inaddr;
     bufPtr = buf;
     /*srand(analogRead(0));*/ srand(0x13);
@@ -138,26 +137,25 @@ extern void dhcp_start(uint8_t* buf, struct inet_addr * inaddr) {
     // it has been shown that some routers send responses as
     // broadcasts. Enable here and disable later
     enc28j60EnableBroadcast();
-    dhcp_send(buf, DHCPDISCOVER);
+    dhcp_send_packet(buf, len, DHCPDISCOVER);
     dhcpState = DHCP_STATE_DISCOVER;
 }
 
-void dhcp_request_ip(uint8_t* buf) {
-    dhcp_send(buf, DHCPREQUEST);
+void dhcp_request_ip(uint8_t* buf, uint32_t len) {
+    dhcp_send_packet(buf, len, DHCPREQUEST);
     dhcpState = DHCP_STATE_REQUEST;
 }
 
 // Main DHCP message sending function, either DHCPDISCOVER or DHCPREQUEST
-void dhcp_send(uint8_t* buf, uint8_t requestType) {
+void dhcp_send_packet(uint8_t* buf, uint32_t len, uint8_t requestType) {
     if (int_addr == NULL)
         return;
     int i = 0;
-    haveDhcpAnswer = 0;
     dhcp_ansError = 0;
     dhcptid_l++;  // increment for next request, finally wrap
     // destination IP gets replaced after this call
 
-    memset(buf, 0, 400);  // XXX OUCH!
+    memset(buf, 0, len);
     send_udp_prepare(buf, (DHCPCLIENT_SRC_PORT_H << 8) | (dhcptid_l & 0xff), int_addr->ipaddr, DHCP_DEST_PORT);
 
     memcpy(buf + ETH_SRC_MAC, int_addr->macaddr, 6);
@@ -244,10 +242,9 @@ void dhcp_send(uint8_t* buf, uint8_t requestType) {
 // Perform lease expiry checks and initiate renewal
 // process the answer from the dhcp server:
 // return 1 on sucessful processing of answer.
-// We set also the variable haveDhcpAnswer
 // Either DHCPOFFER, DHCPACK or DHCPNACK
 // Return 0 for nothing processed, 1 for done soemthing
-uint8_t check_for_dhcp_answer(uint8_t* buf, uint16_t plen) {
+uint8_t check_for_dhcp_answer(uint8_t* buf, uint32_t len, uint16_t plen) {
     // Map struct onto payload
     dhcpData* dhcpPtr = (dhcpData*)&buf[UDP_DATA_P];
     if (plen >= 70 && buf[UDP_SRC_PORT_L_P] == DHCP_SRC_PORT && dhcpPtr->op == DHCP_BOOTREPLY &&
@@ -265,7 +262,7 @@ uint8_t check_for_dhcp_answer(uint8_t* buf, uint16_t plen) {
     return 0;
 }
 
-uint8_t have_dhcpoffer(uint8_t* buf, uint16_t plen) {
+uint8_t have_dhcpoffer(uint8_t* buf, uint32_t len, uint16_t plen) {
     // Map struct onto payload
     dhcpData* dhcpPtr = (dhcpData*)((uint8_t*)buf + UDP_DATA_P);
     // Offered IP address is in yiaddr
@@ -302,7 +299,7 @@ uint8_t have_dhcpoffer(uint8_t* buf, uint16_t plen) {
     return 1;
 }
 
-uint8_t have_dhcpack(uint8_t* buf, uint16_t plen) {
+uint8_t have_dhcpack(uint8_t* buf, uint32_t len, uint16_t plen) {
     dhcpState = DHCP_STATE_OK;
     leaseStart = HAL_GetTick();
     int_addr->dncp_last_lease = leaseStart;
@@ -311,7 +308,7 @@ uint8_t have_dhcpack(uint8_t* buf, uint16_t plen) {
     return 2;
 }
 
-uint8_t dhcp_check_for_renew() {
+uint8_t dhcpRenew() {
     if (int_addr == NULL || dhcpState != DHCP_STATE_OK )
         return -1;
     if (int_addr->dncp_last_lease + int_addr->dncp_lease_time < HAL_GetTick()) {

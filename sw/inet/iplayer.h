@@ -42,18 +42,24 @@ struct socket {
     uint8_t state;
 };
 
+/* Making headers */
+void fillEthHeader(uint8_t *buff, uint32_t len, struct inet_addr * inaddr, uint8_t *dstmac, uint16_t ethtype);
+void fillEthHeaderReply(uint8_t *buff, uint32_t len, struct inet_addr * inaddr);
+void fillEthHeaderBroadcast(uint8_t *buff, uint32_t len, struct inet_addr * inaddr, uint16_t ethtype);
+
 /* DHCP */
 uint8_t initDhcp(struct inet_addr *addr );
 uint8_t renewDhcp(struct inet_addr *addr);
 uint8_t releaseDhcp(struct inet_addr *addr);
 
 /* IP */
-inline uint8_t isHostInLocalNetwork(uint8_t *hostaddr);
+inline uint8_t isHostInLocalNetwork(uint32_t hostaddr, struct inet_addr * inaddr);
 
 /* ARP */
 uint8_t arpCheckAndReply(uint8_t *buff, uint32_t len);
+uint8_t getHostMacByArp(uint8_t *buff, uint32_t len, uint32_t hostaddr, uint8_t *hostmac);
 
 /* SOCK */
-uint8_t checkForSocket(uint8_t *buff, uint32_t len);
+uint8_t socketRoutine(uint8_t *buff, uint32_t len);
 
 #endif

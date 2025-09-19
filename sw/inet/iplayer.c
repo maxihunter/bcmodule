@@ -40,6 +40,25 @@ static struct socket socks[] = {
     {65535, 0, 0 } // EMPTY
 };
 
+void fillEthHeader(uint8_t *buff, uint32_t len, struct inet_addr * inaddr, uint8_t *dstmac, uint16_t ethtype) {
+	struct eth_header* = map_eth_header(buff);
+	memcpy(eth_header->src_mac, inaddr->macaddr, 6);
+	memcpy(eth_header->dst_mac, dstmac, 6);
+	eth_header->ethertype = ethtype;
+}
+
+void fillEthHeaderReply(uint8_t *buff, uint32_t len, struct inet_addr * inaddr) {
+	struct eth_header* = map_eth_header(buff);
+	fillEthHeader(buff, len, inaddr, eth_header->src_mac, eth_header->ethertype);
+}
+
+void fillEthHeaderBroadcast(uint8_t *buff, uint32_t len, struct inet_addr * inaddr, uint16_t ethtype) {
+	struct eth_header* = map_eth_header(buff);
+	memcpy(eth_header->src_mac, inaddr->macaddr, 6);
+	memset(eth_header->dst_mac, 0xff, 6);
+	eth_header->ethertype = ethtype;
+}
+
 uint8_t initDhcp(struct inet_addr *addr ) {
   int_addr = addr;
   int plen = 0;
@@ -78,15 +97,9 @@ uint8_t renewDhcp(struct inet_addr *addr) {
     return dhcp_check_for_renew();
 }
 
-uint8_t isHostInLocalNetwork(uint8_t *hostaddr) {
-	uint8_t oct1 = int_addr->mask[0]&hostaddr[0];
-	uint8_t oct2 = int_addr->mask[1]&hostaddr[1];
-	uint8_t oct3 = int_addr->mask[2]&hostaddr[2];
-	uint8_t oct4 = int_addr->mask[3]&hostaddr[3];
-	return ( ((int_addr->mask[0]&int_addr->ipaddr[0]) == oct1) && 
-			((int_addr->mask[1]&int_addr->ipaddr[1]) == oct2) && 
-			((int_addr->mask[2]&int_addr->ipaddr[2]) == oct3) && 
-			((int_addr->mask[3]&int_addr->ipaddr[3]) == oct4) );
+uint8_t isHostInLocalNetwork(uint32_t hostaddr, struct inet_addr * inaddr) {
+	uint32_t oct1 = int_addr->mask&hostaddr;
+	return ((int_addr->mask&int_addr->ipaddr) == oct1);
 }
 
 uint8_t arpCheckAndReply(uint8_t *buff, uint32_t len) {
@@ -104,7 +117,10 @@ uint8_t arpCheckAndReply(uint8_t *buff, uint32_t len) {
 	if (buff[ETH_ARP_OPCODE_L_P] != ETH_ARP_OPCODE_REQ_L_V) {
 		return 0;
 	}
-	make_eth(buff);
+	fillEthHeaderReply(buff, len, int_addr);
+	struct eth_header* = map_eth_header(buff);
+	eth_header->ethertype = ETHERTYPE_ARP;
+	
 	buff[ETH_ARP_OPCODE_H_P]=ETH_ARP_OPCODE_REPLY_H_V;
 	buff[ETH_ARP_OPCODE_L_P]=ETH_ARP_OPCODE_REPLY_L_V;
 	// fill the mac addresses:
@@ -118,6 +134,54 @@ uint8_t arpCheckAndReply(uint8_t *buff, uint32_t len) {
 	return 1;
 }
 
+static uint8_t waitHostArpReply(uint8_t *buff, uint32_t len, uint32_t hostaddr, uint8_t *hostmac) {
+	uint8_t gotMac = 0;
+	long lastArpRequest = HAL_GetTick();
+	uint8_t retries = 4;
+	while( !gotMac ) {
+    // handle ping and wait for a tcp packet
+		if (HAL_GetTick() > (lastDhcpRequest + 10000L)) {
+			if (retries > 0) {
+				sendArpRequest(buff, len, hostaddr, hostmac);
+				retries--;
+			} else {
+				break;
+			}
+		}
+		plen = enc28j60PacketReceive(PBUFF_LEN, pbuf);
+		if (buff[ETH_ARP_OPCODE_H_P] !=ETH_ARP_OPCODE_REPLY_H_V &&
+			buff[ETH_ARP_OPCODE_L_P]!=ETH_ARP_OPCODE_REPLY_L_V) {
+				continue;
+		}
+		if (memcmp(&buff[ETH_ARP_DST_MAC_P], int_addr->macaddr, 6) != 0 &&
+			memcmp(&buff[ETH_ARP_DST_IP_P], int_addr->ipaddr, 4) != 0) {
+				continue;
+		}
+		memcpy(hostmac, &buff[ETH_ARP_SRC_MAC_P], 6);
+		gotMac = 1;
+    }
+	return gotMac;
+}
+
+uint8_t sendArpRequest(uint8_t *buff, uint32_t len, uint32_t hostaddr, uint8_t *hostmac) {
+	fillEthHeaderBroadcast(buff, len, int_addr, ETHERTYPE_ARP);
+	
+	buff[ETH_ARP_OPCODE_H_P]=ETH_ARP_OPCODE_REQ_H_V;
+	buff[ETH_ARP_OPCODE_L_P]=ETH_ARP_OPCODE_REQ_L_V;
+	// fill the mac addresses:
+	memset(&buff[ETH_ARP_DST_MAC_P], 0xff, 6);
+	memcpy(&buff[ETH_ARP_SRC_MAC_P], int_addr->macaddr, 6);
+	// fill the ip addresses
+	memcpy(&buff[ETH_ARP_DST_IP_P], hostaddr, 4);
+	memcpy(&buff[ETH_ARP_SRC_IP_P], int_addr->ipaddr, 4);
+	// eth+arp is 42 bytes:
+	enc28j60PacketSend(42,buff);
+}
+
+uint8_t getHostMacByArp(uint8_t *buff, uint32_t len, uint32_t hostaddr, uint8_t *hostmac) {
+	sendArpRequest(buff, len, hostaddr, hostmac);
+	return waitHostArpReply(uint8_t *buff, uint32_t len, uint32_t hostaddr, uint8_t *hostmac);
+}
 
 uint8_t icmpCheckAndReply(uint8_t *buff, uint32_t len) {
 	if (len<41){
@@ -163,7 +227,7 @@ void make_echo_reply_from_request(uint8_t *buf,uint16_t len) {
 	}
 }*/
 
-uint8_t checkForSocket(uint8_t *buff, uint32_t len) {
+uint8_t socketRoutine(uint8_t *buff, uint32_t len) {
     if (len < 60)
         return 0;
     return 0;
