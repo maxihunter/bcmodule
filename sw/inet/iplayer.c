@@ -33,13 +33,6 @@
 #define PBUFF_LEN 400
 static uint8_t pbuf[PBUFF_LEN] = {};
 
-static struct inet_addr *int_addr = NULL;
-static struct socket socks[] = {
-    {20, IP_PROTO_TYPE_TCP, SOCK_OPEN },
-    {21, IP_PROTO_TYPE_TCP, SOCK_OPEN },
-    {65535, 0, 0 } // EMPTY
-};
-
 void fillEthHeader(uint8_t *buff, uint32_t len, struct inet_addr * inaddr, uint8_t *dstmac, uint16_t ethtype) {
 	struct eth_header* = map_eth_header(buff);
 	memcpy(eth_header->src_mac, inaddr->macaddr, 6);
@@ -57,44 +50,6 @@ void fillEthHeaderBroadcast(uint8_t *buff, uint32_t len, struct inet_addr * inad
 	memcpy(eth_header->src_mac, inaddr->macaddr, 6);
 	memset(eth_header->dst_mac, 0xff, 6);
 	eth_header->ethertype = ethtype;
-}
-
-uint8_t initDhcp(struct inet_addr *addr ) {
-  int_addr = addr;
-  int plen = 0;
-  uint8_t dhcpState = 0;
-  long lastDhcpRequest = HAL_GetTick();
-  _Bool gotIp = false;
-  uint8_t dhcpTries = 10;	// After 10 attempts fail gracefully so other action can be carried out
-
-  dhcp_start( pbuf, addr );
-
-  while( !gotIp ) {
-    // handle ping and wait for a tcp packet
-    plen = enc28j60PacketReceive(PBUFF_LEN, pbuf);
-      check_for_dhcp_answer( pbuf, plen);
-      dhcpState = dhcp_state();
-      // we are idle here
-      if( dhcpState != DHCP_STATE_OK ) {
-          if (HAL_GetTick() > (lastDhcpRequest + 10000L) ){
-              lastDhcpRequest = HAL_GetTick();
-              if( dhcpTries <= 0 ) 
-                  return 0;		// Failed to allocate address
-                                // send dhcp
-              dhcp_start( pbuf, addr);
-              dhcpTries--;
-          }
-      } else {
-          if( !gotIp ) {
-              gotIp = true;
-          }
-      }
-  }
-  return 1;
-}
-
-uint8_t renewDhcp(struct inet_addr *addr) {
-    return dhcp_check_for_renew();
 }
 
 uint8_t isHostInLocalNetwork(uint32_t hostaddr, struct inet_addr * inaddr) {
@@ -226,10 +181,4 @@ void make_echo_reply_from_request(uint8_t *buf,uint16_t len) {
 		return 0;
 	}
 }*/
-
-uint8_t socketRoutine(uint8_t *buff, uint32_t len) {
-    if (len < 60)
-        return 0;
-    return 0;
-}
 

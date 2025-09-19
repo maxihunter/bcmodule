@@ -96,6 +96,45 @@ static uint8_t* bufPtr = NULL;
 
 inline void addToBuf(uint8_t b) { *bufPtr++ = b; };
 
+
+uint8_t initDhcp(struct inet_addr *addr ) {
+  int_addr = addr;
+  int plen = 0;
+  uint8_t dhcpState = 0;
+  long lastDhcpRequest = HAL_GetTick();
+  _Bool gotIp = false;
+  uint8_t dhcpTries = 10;	// After 10 attempts fail gracefully so other action can be carried out
+
+  dhcp_start( pbuf, addr );
+
+  while( !gotIp ) {
+    // handle ping and wait for a tcp packet
+    plen = enc28j60PacketReceive(PBUFF_LEN, pbuf);
+      check_for_dhcp_answer( pbuf, plen);
+      dhcpState = dhcp_state();
+      // we are idle here
+      if( dhcpState != DHCP_STATE_OK ) {
+          if (HAL_GetTick() > (lastDhcpRequest + 10000L) ){
+              lastDhcpRequest = HAL_GetTick();
+              if( dhcpTries <= 0 ) 
+                  return 0;		// Failed to allocate address
+                                // send dhcp
+              dhcp_start( pbuf, addr);
+              dhcpTries--;
+          }
+      } else {
+          if( !gotIp ) {
+              gotIp = true;
+          }
+      }
+  }
+  return 1;
+}
+
+uint8_t renewDhcp(struct inet_addr *addr) {
+    return dhcp_check_for_renew();
+}
+
 uint8_t dhcp_state(void) {
     // Check lease and request renew if currently OK and time
     // leaseStart - start time in millis

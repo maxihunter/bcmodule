@@ -21,35 +21,28 @@
  * THE SOFTWARE.
  */
 
-#ifndef __IPLAYER_H__
-#define __IPLAYER_H__
-
+#include "net.h"
+#include "transportlayer.h"
+#include "iplayer.h"
+#include "pkt_headers.h"
+#include "enc28j60.h"
 #include "dhcpd.h"
+#include <inttypes.h>
+#include <stdbool.h>
+#include <string.h>
 
-struct inet_addr {
-    uint8_t macaddr[6];
-    uint32_t ipaddr;
-    uint32_t mask;
-    uint32_t gateway;
-	uint8_t gw_macaddr[6];
-    uint32_t dhcpsrv;
-    uint32_t dnssrv;
-    uint32_t dncp_lease_time;
-    long dncp_last_lease;
+static struct inet_addr *int_addr = NULL;
+static struct socket socks[] = {
+    {20, IP_PROTO_TYPE_TCP, SOCK_OPEN },
+    {21, IP_PROTO_TYPE_TCP, SOCK_OPEN },
+    {65535, 0, 0 } // EMPTY
 };
 
-/* Making headers */
-void fillEthHeader(uint8_t *buff, uint32_t len, struct inet_addr * inaddr, uint8_t *dstmac, uint16_t ethtype);
-void fillEthHeaderReply(uint8_t *buff, uint32_t len, struct inet_addr * inaddr);
-void fillEthHeaderBroadcast(uint8_t *buff, uint32_t len, struct inet_addr * inaddr, uint16_t ethtype);
 
-/* IP */
-inline uint8_t isHostInLocalNetwork(uint32_t hostaddr, struct inet_addr * inaddr);
 
-/* ARP */
-uint8_t arpCheckAndReply(uint8_t *buff, uint32_t len);
-uint8_t getHostMacByArp(uint8_t *buff, uint32_t len, uint32_t hostaddr, uint8_t *hostmac);
+uint8_t socketRoutine(uint8_t *buff, uint32_t len) {
+    if (len < 60)
+        return 0;
+    return 0;
+}
 
-/* SOCK */
-
-#endif

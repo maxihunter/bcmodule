@@ -25,6 +25,7 @@
 #define __DHCP_H__
 
 #include <stdint.h>
+#include "iplayer.h"
 
 #define DHCP_HOSTNAME "stm32bcmod"
 #define DHCP_HOSTNAME_LEN 10
@@ -32,17 +33,10 @@
 #define DHCP_BOOTREQUEST 1
 #define DHCP_BOOTRESPONSE 2
 
-struct inet_addr {
-    uint8_t macaddr[6];
-    uint32_t ipaddr;
-    uint32_t mask;
-    uint32_t gateway;
-	uint8_t gw_macaddr[6];
-    uint32_t dhcpsrv;
-    uint32_t dnssrv;
-    uint32_t dncp_lease_time;
-    long dncp_last_lease;
-};
+/* DHCP */
+uint8_t initDhcp(struct inet_addr *addr );
+uint8_t renewDhcp(struct inet_addr *addr);
+uint8_t releaseDhcp(struct inet_addr *addr);
 
 extern void dhcp_start(uint8_t* buf, uint32_t len, struct inet_addr * inaddr);
 
