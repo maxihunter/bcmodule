@@ -30,6 +30,8 @@
 #include <string.h>
 #include "cmd.h"
 
+#include "sd_card.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -68,10 +70,10 @@ static uint8_t cmd_ptr = 0;
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
-static void MX_SPI1_Init(void);
 static void MX_SPI2_Init(void);
 static void MX_USB_PCD_Init(void);
 static void MX_USART1_UART_Init(void);
+static void MX_SPI1_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -151,7 +153,28 @@ int main(void)
   printf("Hello from BCModule ver.%d\r\n\r\n", SW_VER);
   printf("Init system...\r\n");
   printf("Clock OK\r\n");
+  printf("System time is set to 01-01-2020 00:00:00\r\n");
 
+  char tx[] = "5050A55A";
+  //HAL_SPI_Transmit(&hspi1, "5000asdA", 8, 200);
+  //HAL_SPI_Transmit(&hspi1, &dt, 8, 1000);
+	uint8_t rx = 0;
+	int r;
+
+    /*HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, GPIO_PIN_RESET);
+    HAL_Delay(2);
+	r = HAL_SPI_Transmit(&hspi1, &tx, 5, 1000);
+	if (r != HAL_OK)
+        printf("SPI Trinsmit failed\r\n");
+    HAL_Delay(2);
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, GPIO_PIN_SET);*/
+    SS_SD_DESELECT();
+    for(int i=0;i<10;i++) //80 импульсов (не менее 74) Даташит стр 91
+         SPI_Release();
+    SS_SD_SELECT();
+    SPI_SendByte(0x35);
+    SPI_SendByte(0x53);
+  /*
   FATFS fs;
   FRESULT res;
   res = f_mount(&fs, USERPath, 1);
@@ -159,7 +182,7 @@ int main(void)
       printf("SDCard not found\r\n");
   } else {
       printf("SDCard OK\r\n");
-  }
+  }*/
   
   enc28j60_set_spi(&hspi2);
   //enc28j60Init(mac);
@@ -280,7 +303,7 @@ static void MX_SPI1_Init(void)
   hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi1.Init.NSS = SPI_NSS_SOFT;
-  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_4;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_16;
   hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -419,7 +442,8 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4|GPIO_PIN_8, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, GPIO_PIN_SET);
 
   /*Configure GPIO pin : PC13 */
   GPIO_InitStruct.Pin = GPIO_PIN_13;
@@ -428,8 +452,8 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : PA4 */
-  GPIO_InitStruct.Pin = GPIO_PIN_4;
+  /*Configure GPIO pin : PA3 */
+  GPIO_InitStruct.Pin = GPIO_PIN_3;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
