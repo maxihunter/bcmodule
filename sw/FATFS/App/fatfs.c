@@ -33,7 +33,7 @@ void MX_FATFS_Init(void)
   retUSER = FATFS_LinkDriver(&USER_Driver, USERPath);
 
   /* USER CODE BEGIN Init */
-  /* additional user code for init */
+  /* additional user code for init */     
   /* USER CODE END Init */
 }
 
@@ -50,5 +50,5 @@ DWORD get_fattime(void)
 }
 
 /* USER CODE BEGIN Application */
-
+     
 /* USER CODE END Application */
