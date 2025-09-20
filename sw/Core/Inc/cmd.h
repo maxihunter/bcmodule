@@ -25,6 +25,7 @@
 #define __CMD_H__
 
 #include <stdint.h>
+#include "stm32f1xx_hal.h"
 
 #define SW_VER 1
 

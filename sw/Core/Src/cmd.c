@@ -28,9 +28,11 @@
 #include <string.h>
 
 extern struct inet_addr net_addr;
+extern RTC_HandleTypeDef hrtc;
 
 static void print_help(char *cmd);
 static void print_version(char *cmd);
+static void print_date(char *cmd);
 
 const struct cmd_description cmd_list[] = {
     {"ver", 0, "Print Version", &print_version},
@@ -42,6 +44,7 @@ const struct cmd_description cmd_list[] = {
     {"con1", 6, "CON1 on/off", &print_help},
     {"con2", 7, "CON2 on/off", &print_help},
     {"con3", 8, "CON3 on/off", &print_help},
+    {"date", 9, "Show date", &print_date},
     {NULL, 255, NULL, NULL},
 };
 /*{
@@ -91,3 +94,17 @@ void print_version(char *cmd) {
     printf("sw version: %d\r\n", SW_VER);
 }
 
+void print_date(char *cmd) {
+  RTC_TimeTypeDef sTime;
+  RTC_DateTypeDef sDate;
+  if (HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN) != HAL_OK)
+  {
+      //Error_Handler();
+  }
+  if (HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN) != HAL_OK)
+  {
+      //Error_Handler();
+  }
+  printf("System time is set to %02d-%02d-20%02d %02d:%02d:%02d\r\n", sDate.Date, sDate.Month, sDate.Year,
+          sTime.Hours, sTime.Minutes, sTime.Seconds);
+}
