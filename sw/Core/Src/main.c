@@ -68,7 +68,6 @@ static char cmd[256] = {0};
 static uint8_t cmd_ptr = 0;
 
 uint8_t sect[512];
-//char buffer1[512] ="Selection of VAM is set by the previous address set instruction. If the address set instruction of RAM is not performed before this instruction, the data that has been read first is invalid, as the direction of AC is not yet determined. If RAM data is read several times without RAM address instructions set before, read operation, the correct RAM data can be obtained from the second. But the first data would be incorrect, as there is no time margin to transfer RAM data. In case of DDRAM read operation The..."; //½óôåð äàííûõ äë¤ çàïèñè/÷òåíè¤
 extern char str1[60];
 uint32_t byteswritten,bytesread;
 uint8_t result;
@@ -76,6 +75,8 @@ extern char USERPath[4]; /* logical drive path */
 FATFS SDFatFs;
 FATFS *fs;
 FIL MyFile;
+RTC_TimeTypeDef sTime;
+RTC_DateTypeDef sDate;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -172,28 +173,19 @@ int main(void)
   /* USER CODE BEGIN 2 */
   printf("Hello from BCModule ver.%d\r\n\r\n", SW_VER);
   printf("Init system...\r\n");
+  if (HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN) != HAL_OK)
+  {
+      Error_Handler();
+  }
+  if (HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN) != HAL_OK)
+  {
+      Error_Handler();
+  }
   printf("Clock OK\r\n");
-  printf("System time is set to 01-01-2020 00:00:00\r\n");
+  printf("System time is set to %02d-%02d-20%02d %02d:%02d:%02d\r\n", sDate.Date, sDate.Month, sDate.Year,
+          sTime.Hours, sTime.Minutes, sTime.Seconds);
 
-  char tx[] = "5050A55A";
-  //HAL_SPI_Transmit(&hspi1, "5000asdA", 8, 200);
-  //HAL_SPI_Transmit(&hspi1, &dt, 8, 1000);
-	uint8_t rx = 0;
-	int r;
-
-    /*HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, GPIO_PIN_RESET);
-    HAL_Delay(2);
-	r = HAL_SPI_Transmit(&hspi1, &tx, 5, 1000);
-	if (r != HAL_OK)
-        printf("SPI Trinsmit failed\r\n");
-    HAL_Delay(2);
-    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, GPIO_PIN_SET);*/
-    /*SS_SD_DESELECT();
-    for(int i=0;i<10;i++) //80 импульсов (не менее 74) Даташит стр 91
-         SPI_Release();
-    SS_SD_SELECT();
-    SPI_SendByte(0x35);
-    SPI_SendByte(0x53);*/
+    printf("SDCard Info:\r\n");
 	disk_initialize(SDFatFs.drv);
 	//read
 	/*
@@ -242,6 +234,7 @@ int main(void)
 	{
 		Error_Handler();
 	}
+#if 0
 	else
 	{
 		fileInfo.lfname = (char*)sect;
@@ -260,7 +253,7 @@ int main(void)
 					if(fileInfo.fattrib&AM_DIR)
 					{
 						HAL_UART_Transmit(&huart1,(uint8_t*)"  [DIR]",7,0x1000);
-					}					
+					}
 				}
 				else break;
 				HAL_UART_Transmit(&huart1,(uint8_t*)"\r\n",2,0x1000);
@@ -268,17 +261,18 @@ int main(void)
 			f_closedir(&dir);
 		}
 	}
+#endif
 	f_getfree("/", &fre_clust, &fs);
-	printf("fre_clust: %lu\r\n",fre_clust);
-	printf("n_fatent: %lu\r\n",fs->n_fatent);
-	printf("fs_csize: %d\r\n",fs->csize);
+	printf("Free clusters: %lu\r\n",fre_clust);
+	printf("FATent: %lu\r\n",fs->n_fatent);
+	printf("FS csize: %d\r\n",fs->csize);
 	tot_sect = (fs->n_fatent - 2) * fs->csize;
-	printf("tot_sect: %lu\r\n",tot_sect);
+	printf("Total sectors: %lu\r\n",tot_sect);
 	fre_sect = fre_clust * fs->csize;
-	printf("fre_sect: %lu\r\n",fre_sect);
+	printf("Sectors free: %lu\r\n",fre_sect);
 	printf( "%lu KB total drive space.\r\n%lu KB available.\r\n",
 	fre_sect/2, tot_sect/2);
-	FATFS_UnLinkDriver(USERPath);
+	//FATFS_UnLinkDriver(USERPath);
   /*
   FATFS fs;
   FRESULT res;
@@ -317,6 +311,7 @@ int main(void)
           net_addr.gateway[0], net_addr.gateway[1], net_addr.gateway[2], net_addr.gateway[3], 
           net_addr.dnssrv[0], net_addr.dnssrv[1], net_addr.dnssrv[2], net_addr.dnssrv[3] 
           );
+  printf("\r\nSystem ready!\r\n");
   HAL_UART_Transmit(&huart1, "--#> ", 5, HAL_MAX_DELAY);
   HAL_UART_Receive_IT(&huart1, inbuff, 1);
   /* USER CODE END 2 */
