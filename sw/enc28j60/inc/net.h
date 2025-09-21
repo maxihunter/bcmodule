@@ -45,6 +45,7 @@
 #define ETH_ARP_OPCODE_REQ_L_V 0x01
 // start of arp header:
 #define ETH_ARP_P 0xe
+#define ETH_ARP_PROTTYPE 0x10
 //
 #define ETHTYPE_ARP_L_V 0x06
 // arp.dst.ip
