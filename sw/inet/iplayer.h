@@ -26,6 +26,8 @@
 
 #include "dhcpd.h"
 
+#define PRINTABLE_IPADDR(x) (uint8_t)(x), (uint8_t)(x >> 8), (uint8_t)(x >> 16), (uint8_t)(x >> 24)
+
 struct inet_addr {
     uint8_t macaddr[6];
     uint32_t ipaddr;
@@ -44,10 +46,12 @@ void fillEthHeaderReply(uint8_t *buff, uint32_t len, struct inet_addr * inaddr);
 void fillEthHeaderBroadcast(uint8_t *buff, uint32_t len, struct inet_addr * inaddr, uint16_t ethtype);
 
 /* IP */
+void prepareIpLayer(struct inet_addr * inaddr, uint8_t *buff, uint32_t pbuff_len);
 inline uint8_t isHostInLocalNetwork(uint32_t hostaddr, struct inet_addr * inaddr);
 
 /* ARP */
 uint8_t arpCheckAndReply(uint8_t *buff, uint32_t len);
+uint8_t icmpCheckAndReply(uint8_t *buff, uint32_t len);
 uint8_t getHostMacByArp(uint8_t *buff, uint32_t len, uint32_t hostaddr, uint8_t *hostmac);
 
 /* SOCK */

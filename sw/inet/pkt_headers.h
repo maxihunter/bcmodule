@@ -26,10 +26,11 @@
 #define __PKT_HEADERS_H__
 
 #include <inttypes.h>
+#include <string.h>
 // EtherTypes
 
-#define ETHERTYPE_IPV4 0x0800	//Internet Protocol version 4 (IPv4)
-#define ETHERTYPE_ARP  0x0806	//Address Resolution Protocol(ARP)
+#define ETHERTYPE_IPV4 0x0008	//Internet Protocol version 4 (IPv4)
+#define ETHERTYPE_ARP  0x0608	//Address Resolution Protocol(ARP)
 #define ETHERTYPE_WAKEONLAN 0x0842 //	Wake - on - LAN[8]
 #define ETHERTYPE_SRP  0x22EA	//Stream Reservation Protocol
 #define ETHERTYPE_AVTP 0x22F0	//Audio Video Transport Protocol(AVTP)
@@ -173,7 +174,7 @@
 struct eth_header {
 	uint8_t dst_mac[6];
 	uint8_t src_mac[6];
-	uint8_t tag[4];
+//	uint8_t tag[4];
 	uint16_t ethertype;
 } __attribute__((packed));
 
@@ -212,11 +213,28 @@ struct tcpip_header {
 	uint16_t urgent_ptr;
 }__attribute__((packed));
 
-inline void extract_eth_header(uint8_t* buff, struct eth_header* ethd);
-inline void extract_ip_header(uint8_t* buff, struct ip_header* iphd);
-inline struct eth_header* map_eth_header(uint8_t* buff);
-inline struct ip_header* map_ip_header(uint8_t* buff);
-inline uint8_t* get_pkt_data(uint8_t* buff, const struct ip_header* iphd);
+inline void extract_eth_header(uint8_t* buff, struct eth_header* ethd) {
+	memcpy((uint8_t*)ethd, buff, sizeof(struct eth_header));
+}
+
+inline void extract_ip_header(uint8_t* buff, struct ip_header* iphd) {
+	memcpy((uint8_t*)iphd, buff+sizeof(struct eth_header), sizeof(struct ip_header));
+}
+
+inline struct eth_header* map_eth_header(uint8_t* buff) {
+    return (struct eth_header*)buff;
+}
+
+inline struct ip_header* map_ip_header(uint8_t* buff) {
+    return (struct ip_header*)(buff+sizeof(struct eth_header));
+}
+
+inline uint8_t* get_pkt_data(uint8_t* buff, const struct ip_header* iphd) {
+	if (IP_HDR_GET_IHL(iphd->version_ihl) == 5) {
+		return buff + sizeof(struct eth_header) + sizeof(struct ip_header);
+	}
+	return buff;
+}
 
 #endif // __PKT_HEADERS_H__
 

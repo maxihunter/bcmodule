@@ -35,10 +35,8 @@ ndef ETHERNET_LED_GPIO
 #	error Please define chip-select pin ETHERNET_CS_PIN, for example by gcc option -DETHERNET_CS_PIN=GPIO_PIN_4
 #endif
 
-#ifndef ETHERNET_CS_DELAY
-#	warning ETHERNET_CS_DELAY is not defined. Setting to "2" (mseconds). Adapter may work very slow or not properly. If the latency on "1" is too big, but on "0" the adapter is not working properly, you can try values >= 10: it will use other delay method (for example try value 1000).
-#	define ETHERNET_CS_DELAY 2
-#endif
+#define ETHERNET_CS_DELAY 2
+//#	warning ETHERNET_CS_DELAY is not defined. Setting to "2" (mseconds). Adapter may work very slow or not properly. If the latency on "1" is too big, but on "0" the adapter is not working properly, you can try values >= 10: it will use other delay method (for example try value 1000).
 
 #if ETHERNET_CS_DELAY >= 10
 #	define ETHERNET_CS_DELAY_PROC {volatile uint32_t i=ETHERNET_CS_DELAY; while(i--);}

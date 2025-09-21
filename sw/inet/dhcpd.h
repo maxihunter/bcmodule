@@ -32,20 +32,24 @@
 
 #define DHCP_BOOTREQUEST 1
 #define DHCP_BOOTRESPONSE 2
+#define DHCPDISCOVER 0x01
+#define DHCPOFFER 0x02
+#define DHCPREQUEST 0x03
+#define DHCPACK 0x05
+//#define DHCPNACK
 
 /* DHCP */
-uint8_t initDhcp(struct inet_addr *addr );
-uint8_t renewDhcp(struct inet_addr *addr);
+uint8_t initDhcp(struct inet_addr *addr, uint8_t * buff, uint32_t buf_len);
 uint8_t releaseDhcp(struct inet_addr *addr);
 
 extern void dhcp_start(uint8_t* buf, uint32_t len, struct inet_addr * inaddr);
 
 extern uint8_t dhcp_state(void);
 
-uint8_t check_for_dhcp_answer(uint8_t* buf, uint32_t len, uint16_t plen);
+uint8_t checkForDhcpReply(uint8_t* buf, uint16_t plen);
 
-uint8_t have_dhcpoffer(uint8_t* buf, uint32_t len, uint16_t plen);
-uint8_t have_dhcpack(uint8_t* buf, uint32_t len, uint16_t plen);
+uint8_t have_dhcpoffer(uint8_t* buf, uint16_t plen);
+uint8_t have_dhcpack(uint8_t* buf, uint16_t plen);
 uint8_t dhcpRenew();
 
 #endif // __DHCP_H__

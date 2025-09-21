@@ -60,15 +60,22 @@ UART_HandleTypeDef huart1;
 PCD_HandleTypeDef hpcd_USB_FS;
 
 /* USER CODE BEGIN PV */
-struct inet_addr net_addr = {0};
-static const uint8_t mac[] = {0xD2, 0x18, 0XBB, 0x55, 0x66, 0x77};
-static long lastDhcpRequest = 0;
-static char inbuff[10] = {0};
+// CLI
+static char inbuff[5] = {0};
 static char cmd[CMD_MAX_LEN] = {0};
 static uint8_t cmd_ptr = 0;
 
+// NETWORK
+struct inet_addr net_addr = {0};
+static const uint8_t mac[] = {0xD2, 0x18, 0XBB, 0x55, 0x66, 0x77};
+static long lastDhcpRequest = 0;
+#define PBUFF_LEN 400
+static uint8_t pbuf[PBUFF_LEN] = {0};
+static uint16_t plen = 0;
+
+// SD CARD
 uint8_t sect[512];
-extern char str1[60];
+//extern char str1[60];
 uint32_t byteswritten,bytesread;
 uint8_t result;
 extern char USERPath[4]; /* logical drive path */
@@ -114,7 +121,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
             HAL_UART_Transmit(huart, "\n", 1, 100);
             //HAL_UART_Transmit(huart, cmd, cmd_ptr, 100);
             cmd_process(cmd, cmd_ptr);
-            memset(cmd, 0, 256);
+            memset(cmd, 0, CMD_MAX_LEN);
             cmd_ptr = 0;
             HAL_UART_Transmit(huart, "--#> ", 6, HAL_MAX_DELAY);
         } else {
@@ -137,7 +144,6 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-	uint16_t i;
 	FRESULT res; //ðåçóëüòàò âûïîëíåíèÿ
 	uint8_t wtext[]="Hello from STM32!!!";
 	FILINFO fileInfo;
@@ -286,32 +292,32 @@ int main(void)
   
   enc28j60_set_spi(&hspi2);
   enc28j60Init(mac);
-  printf("Network OK\r\n");
+  printf("Network module OK\r\n");
   //enc28j60DisableBroadcast();
   //enc28j60DisableMulticast();
   
-  /*uint8_t bbuff[] = "HERE IS ONE PACKEttttttttttttttttttttttttttttttttttttttttttTTTTTTTTTTT";
+  uint8_t bbuff[] = "HERE IS ONE PACKEttttttttttttttttttttttttttttttttttttttttttTTTTTTTTTTT";
 
   memcpy(bbuff + ETH_SRC_MAC, mac, 6);
   memset(bbuff + ETH_DST_MAC, 0xFF, 6);
-  enc28j60PacketSend(40, bbuff);*/
+  enc28j60PacketSend(40, bbuff);
 
   lastDhcpRequest = HAL_GetTick();
   memcpy(net_addr.macaddr, mac, 6);
   printf("Getting IP from DHCP... (%x:%x:%x:%x:%x:%x)\r\n", 
           net_addr.macaddr[0], net_addr.macaddr[1], net_addr.macaddr[2], net_addr.macaddr[3],
           net_addr.macaddr[4], net_addr.macaddr[5]);
-  initDhcp(&net_addr);
+  initDhcp(&net_addr, pbuf, PBUFF_LEN);
+  prepareIpLayer(&net_addr, pbuf, PBUFF_LEN);
   printf(
           "\tIP address: %d.%d.%d.%d\r\n"
           "\tIP netmask: %d.%d.%d.%d\r\n"
           "\tGW address: %d.%d.%d.%d\r\n"
           "\tDNS address: %d.%d.%d.%d\r\n",
-          net_addr.ipaddr[0], net_addr.ipaddr[1], net_addr.ipaddr[2], net_addr.ipaddr[3],
-          net_addr.mask[0], net_addr.mask[1], net_addr.mask[2], net_addr.mask[3], 
-          net_addr.gateway[0], net_addr.gateway[1], net_addr.gateway[2], net_addr.gateway[3], 
-          net_addr.dnssrv[0], net_addr.dnssrv[1], net_addr.dnssrv[2], net_addr.dnssrv[3] 
-          );
+          PRINTABLE_IPADDR(net_addr.ipaddr),
+          PRINTABLE_IPADDR(net_addr.mask),
+          PRINTABLE_IPADDR(net_addr.gateway),
+          PRINTABLE_IPADDR(net_addr.dnssrv));
   printf("\r\nSystem ready!\r\n");
   HAL_UART_Transmit(&huart1, "--#> ", 5, HAL_MAX_DELAY);
   HAL_UART_Receive_IT(&huart1, inbuff, 1);
@@ -322,14 +328,17 @@ int main(void)
   while (1)
   {
     HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_12);
-    /*HAL_GPIO_WritePin(GPIOA, GPIO_PIN_2, GPIO_PIN_RESET);
-    HAL_Delay(100);
-    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_RESET);
-    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_SET);
-    HAL_Delay(100);
-    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_RESET);
-    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_2, GPIO_PIN_SET);*/
-    HAL_Delay(100);
+
+    // Network routine
+    plen = enc28j60PacketReceive(PBUFF_LEN, pbuf);
+    if(arpCheckAndReply(pbuf, plen))
+        continue;
+
+    if(icmpCheckAndReply(pbuf, plen))
+        continue;
+
+    dhcpRenew();
+    HAL_Delay(10);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
