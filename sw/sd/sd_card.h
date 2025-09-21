@@ -10,8 +10,10 @@
 #define CS_SD_PIN GPIO_PIN_3
 #define SS_SD_SELECT() HAL_GPIO_WritePin(CS_SD_GPIO_PORT, CS_SD_PIN, GPIO_PIN_RESET)
 #define SS_SD_DESELECT() HAL_GPIO_WritePin(CS_SD_GPIO_PORT, CS_SD_PIN, GPIO_PIN_SET)
-#define LD_ON HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET); //RED
-#define LD_OFF HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET); //RED
+#define LD_OFF HAL_GPIO_WritePin(GPIOA, GPIO_PIN_2, GPIO_PIN_RESET); //GREEN
+#define LD_ON HAL_GPIO_WritePin(GPIOA, GPIO_PIN_2, GPIO_PIN_SET); //GREEN 
+#define LD_WR_OFF HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_RESET); //RED
+#define LD_WR_ON HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_SET); //RED
 //--------------------------------------------------
 /* Card type flags (CardType) */
 #define CT_MMC 0x01 /* MMC ver 3 */

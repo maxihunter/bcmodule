@@ -12,21 +12,22 @@
 #define CMD55 (0x40+55) // APP_CMD
 #define CMD58 (0x40+58) // READ_OCR
 //--------------------------------------------------
-extern SPI_HandleTypeDef hspi2;
+extern SPI_HandleTypeDef hspi1;
 extern UART_HandleTypeDef huart1;
-extern volatile uint16_t Timer1;
+//extern volatile uint16_t Timer1;
 sd_info_ptr sdinfo;
 char str1[60]={0};
 //--------------------------------------------------
 static void Error (void)
 {
   LD_ON;
+  LD_WR_ON;
 }
 //-----------------------------------------------
 uint8_t SPIx_WriteRead(uint8_t Byte)
 {
   uint8_t receivedbyte = 0;
-  if(HAL_SPI_TransmitReceive(&hspi2,(uint8_t*) &Byte,(uint8_t*) &receivedbyte,1,0x1000)!=HAL_OK)
+  if(HAL_SPI_TransmitReceive(&hspi1,(uint8_t*) &Byte,(uint8_t*) &receivedbyte,1,0x1000)!=HAL_OK)
   {
     Error();
   }
@@ -97,15 +98,17 @@ static uint8_t SD_cmd (uint8_t cmd, uint32_t arg)
 //-----------------------------------------------
 void SD_PowerOn(void)
 {
-  Timer1 = 0;
-  while(Timer1<2) //ждём 20 милисекунд, для того, чтобы напряжение стабилизировалось
-    ;
+  //Timer1 = 0;
+  //while(Timer1<2) //ждём 20 милисекунд, для того, чтобы напряжение стабилизировалось
+    ///;
+  HAL_Delay(200);
 }
 //-----------------------------------------------
 uint8_t SD_Read_Block (uint8_t *buff, uint32_t lba)
 {
   uint8_t result;
   uint16_t cnt;
+  LD_ON;
 	result=SD_cmd (CMD17, lba); //CMD17 даташит стр 50 и 96
 	if (result!=0x00) return 5; //Выйти, если результат не 0x00
 	  SPI_Release();
@@ -118,6 +121,7 @@ uint8_t SD_Read_Block (uint8_t *buff, uint32_t lba)
   for (cnt=0;cnt<512;cnt++) buff[cnt]=SPI_ReceiveByte(); //получаем байты блока из шины в буфер
   SPI_Release(); //Пропускаем контрольную сумму
   SPI_Release();
+  LD_OFF;
   return 0;
 }
 //-----------------------------------------------
@@ -125,6 +129,7 @@ uint8_t SD_Write_Block (uint8_t *buff, uint32_t lba)
 {
   uint8_t result;
   uint16_t cnt;
+  LD_WR_ON;
   result=SD_cmd(CMD24,lba); //CMD24 даташит стр 51 и 97-98
   if (result!=0x00) return 6; //Выйти, если результат не 0x00
   SPI_Release();
@@ -139,6 +144,7 @@ uint8_t SD_Write_Block (uint8_t *buff, uint32_t lba)
     result=SPI_ReceiveByte();
     cnt++;
   } while ( (result!=0xFF)&&(cnt<0xFFFF) );
+  LD_WR_OFF;
   if (cnt>=0xFFFF) return 6;
   return 0;
 }
@@ -148,17 +154,18 @@ uint8_t sd_ini(void)
 	uint8_t i, cmd;
   int16_t tmr;
   uint32_t temp;
-  LD_OFF;
+  LD_ON;
+  LD_WR_ON;
   sdinfo.type = 0;
 	uint8_t ocr[4];
-	temp = hspi2.Init.BaudRatePrescaler;
-	hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_128; //156.25 kbbs
-	HAL_SPI_Init(&hspi2);
+	temp = hspi1.Init.BaudRatePrescaler;
+	hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_256; //156.25 kbbs
+	HAL_SPI_Init(&hspi1);
 	SS_SD_DESELECT();
 	for(i=0;i<10;i++) //80 импульсов (не менее 74) Даташит стр 91
 		SPI_Release();
-	hspi2.Init.BaudRatePrescaler = temp;
-	HAL_SPI_Init(&hspi2);
+	hspi1.Init.BaudRatePrescaler = temp;
+	HAL_SPI_Init(&hspi1);
 	SS_SD_SELECT();
   if (SD_cmd(CMD0, 0) == 1) // Enter Idle state
   {
@@ -200,8 +207,10 @@ uint8_t sd_ini(void)
   {
     return 1;
   }
-  sprintf(str1,"Type SD: 0x%02X\r\n",sdinfo.type);
-  HAL_UART_Transmit(&huart1,(uint8_t*)str1,strlen(str1),0x1000);	
+  printf(str1,"Type SD: 0x%02X\r\n",sdinfo.type);
+  LD_OFF;
+  LD_WR_OFF;
+  //HAL_UART_Transmit(&huart1,(uint8_t*)str1,strlen(str1),0x1000);	
   return 0;
 }
 //-----------------------------------------------

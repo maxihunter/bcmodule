@@ -50,6 +50,8 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+RTC_HandleTypeDef hrtc;
+
 SPI_HandleTypeDef hspi1;
 SPI_HandleTypeDef hspi2;
 
@@ -65,6 +67,15 @@ static char inbuff[10] = {0};
 static char cmd[256] = {0};
 static uint8_t cmd_ptr = 0;
 
+uint8_t sect[512];
+//char buffer1[512] ="Selection of VAM is set by the previous address set instruction. If the address set instruction of RAM is not performed before this instruction, the data that has been read first is invalid, as the direction of AC is not yet determined. If RAM data is read several times without RAM address instructions set before, read operation, the correct RAM data can be obtained from the second. But the first data would be incorrect, as there is no time margin to transfer RAM data. In case of DDRAM read operation The..."; //½óôåð äàííûõ äë¤ çàïèñè/÷òåíè¤
+extern char str1[60];
+uint32_t byteswritten,bytesread;
+uint8_t result;
+extern char USERPath[4]; /* logical drive path */
+FATFS SDFatFs;
+FATFS *fs;
+FIL MyFile;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -74,6 +85,7 @@ static void MX_SPI2_Init(void);
 static void MX_USB_PCD_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_SPI1_Init(void);
+static void MX_RTC_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -123,6 +135,13 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
+	uint16_t i;
+	FRESULT res; //ðåçóëüòàò âûïîëíåíèÿ
+	uint8_t wtext[]="Hello from STM32!!!";
+	FILINFO fileInfo;
+	char *fn;
+	DIR dir;
+	DWORD fre_clust, fre_sect, tot_sect;
 
   /* USER CODE END 1 */
 
@@ -144,11 +163,12 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_SPI1_Init();
   MX_SPI2_Init();
   MX_USB_PCD_Init();
   MX_FATFS_Init();
   MX_USART1_UART_Init();
+  MX_SPI1_Init();
+  MX_RTC_Init();
   /* USER CODE BEGIN 2 */
   printf("Hello from BCModule ver.%d\r\n\r\n", SW_VER);
   printf("Init system...\r\n");
@@ -168,12 +188,97 @@ int main(void)
         printf("SPI Trinsmit failed\r\n");
     HAL_Delay(2);
     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, GPIO_PIN_SET);*/
-    SS_SD_DESELECT();
+    /*SS_SD_DESELECT();
     for(int i=0;i<10;i++) //80 импульсов (не менее 74) Даташит стр 91
          SPI_Release();
     SS_SD_SELECT();
     SPI_SendByte(0x35);
-    SPI_SendByte(0x53);
+    SPI_SendByte(0x53);*/
+	disk_initialize(SDFatFs.drv);
+	//read
+	/*
+	if(f_mount(&SDFatFs,(TCHAR const*)USERPath,0)!=FR_OK)
+	{
+		Error_Handler();
+	}
+	else
+	{
+		if(f_open(&MyFile,"123.txt",FA_READ)!=FR_OK)
+		{
+			Error_Handler();
+		}
+		else
+		{
+			ReadLongFile();
+			f_close(&MyFile);
+		}
+	}
+	*/
+	//write
+	/*
+	if(f_mount(&SDFatFs,(TCHAR const*)USERPath,0)!=FR_OK)
+	{
+		Error_Handler();
+	}
+	else
+	{
+		if(f_open(&MyFile,"mywrite.txt",FA_CREATE_ALWAYS|FA_WRITE)!=FR_OK)
+		{
+			Error_Handler();
+		}
+		else
+		{
+			res=f_write(&MyFile,wtext,sizeof(wtext),(void*)&byteswritten);
+			if((byteswritten==0)||(res!=FR_OK))
+			{
+				Error_Handler();
+			}
+			f_close(&MyFile);
+		}
+	}
+	*/
+	//read dir
+	if(f_mount(&SDFatFs,(TCHAR const*)USERPath,0)!=FR_OK)
+	{
+		Error_Handler();
+	}
+	else
+	{
+		fileInfo.lfname = (char*)sect;
+		fileInfo.lfsize = sizeof(sect);
+		result = f_opendir(&dir, "/");
+		if (result == FR_OK)
+		{
+			while(1)
+			{
+				result = f_readdir(&dir, &fileInfo);
+				if (result==FR_OK && fileInfo.fname[0])
+				{
+					fn = fileInfo.lfname;
+					if(strlen(fn)) HAL_UART_Transmit(&huart1,(uint8_t*)fn,strlen(fn),0x1000);
+					else HAL_UART_Transmit(&huart1,(uint8_t*)fileInfo.fname,strlen((char*)fileInfo.fname),0x1000);
+					if(fileInfo.fattrib&AM_DIR)
+					{
+						HAL_UART_Transmit(&huart1,(uint8_t*)"  [DIR]",7,0x1000);
+					}					
+				}
+				else break;
+				HAL_UART_Transmit(&huart1,(uint8_t*)"\r\n",2,0x1000);
+			}
+			f_closedir(&dir);
+		}
+	}
+	f_getfree("/", &fre_clust, &fs);
+	printf("fre_clust: %lu\r\n",fre_clust);
+	printf("n_fatent: %lu\r\n",fs->n_fatent);
+	printf("fs_csize: %d\r\n",fs->csize);
+	tot_sect = (fs->n_fatent - 2) * fs->csize;
+	printf("tot_sect: %lu\r\n",tot_sect);
+	fre_sect = fre_clust * fs->csize;
+	printf("fre_sect: %lu\r\n",fre_sect);
+	printf( "%lu KB total drive space.\r\n%lu KB available.\r\n",
+	fre_sect/2, tot_sect/2);
+	FATFS_UnLinkDriver(USERPath);
   /*
   FATFS fs;
   FRESULT res;
@@ -185,7 +290,7 @@ int main(void)
   }*/
   
   enc28j60_set_spi(&hspi2);
-  //enc28j60Init(mac);
+  enc28j60Init(mac);
   printf("Network OK\r\n");
   //enc28j60DisableBroadcast();
   //enc28j60DisableMulticast();
@@ -201,7 +306,7 @@ int main(void)
   printf("Getting IP from DHCP... (%x:%x:%x:%x:%x:%x)\r\n", 
           net_addr.macaddr[0], net_addr.macaddr[1], net_addr.macaddr[2], net_addr.macaddr[3],
           net_addr.macaddr[4], net_addr.macaddr[5]);
-  //initDhcp(&net_addr);
+  initDhcp(&net_addr);
   printf(
           "\tIP address: %d.%d.%d.%d\r\n"
           "\tIP netmask: %d.%d.%d.%d\r\n"
@@ -220,12 +325,14 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
-    /*if (enc28j60linkup()) {
-      HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
-    } else {
-      HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET);
-    }*/
+    HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_12);
+    /*HAL_GPIO_WritePin(GPIOA, GPIO_PIN_2, GPIO_PIN_RESET);
+    HAL_Delay(100);
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_SET);
+    HAL_Delay(100);
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_2, GPIO_PIN_SET);*/
     HAL_Delay(100);
     /* USER CODE END WHILE */
 
@@ -247,9 +354,10 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE|RCC_OSCILLATORTYPE_LSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
   RCC_OscInitStruct.HSEPredivValue = RCC_HSE_PREDIV_DIV1;
+  RCC_OscInitStruct.LSEState = RCC_LSE_ON;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
@@ -272,12 +380,71 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
-  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USB;
+  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_RTC|RCC_PERIPHCLK_USB;
+  PeriphClkInit.RTCClockSelection = RCC_RTCCLKSOURCE_LSE;
   PeriphClkInit.UsbClockSelection = RCC_USBCLKSOURCE_PLL_DIV1_5;
   if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
   {
     Error_Handler();
   }
+}
+
+/**
+  * @brief RTC Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_RTC_Init(void)
+{
+
+  /* USER CODE BEGIN RTC_Init 0 */
+
+  /* USER CODE END RTC_Init 0 */
+
+  RTC_TimeTypeDef sTime = {0};
+  RTC_DateTypeDef DateToUpdate = {0};
+
+  /* USER CODE BEGIN RTC_Init 1 */
+
+  /* USER CODE END RTC_Init 1 */
+
+  /** Initialize RTC Only
+  */
+  hrtc.Instance = RTC;
+  hrtc.Init.AsynchPrediv = RTC_AUTO_1_SECOND;
+  hrtc.Init.OutPut = RTC_OUTPUTSOURCE_ALARM;
+  if (HAL_RTC_Init(&hrtc) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /* USER CODE BEGIN Check_RTC_BKUP */
+
+  /* USER CODE END Check_RTC_BKUP */
+
+  /** Initialize RTC and set the Time and Date
+  */
+  sTime.Hours = 0x10;
+  sTime.Minutes = 0x0;
+  sTime.Seconds = 0x0;
+
+  if (HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BCD) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  DateToUpdate.WeekDay = RTC_WEEKDAY_MONDAY;
+  DateToUpdate.Month = RTC_MONTH_JANUARY;
+  DateToUpdate.Date = 0x1;
+  DateToUpdate.Year = 0x25;
+
+  if (HAL_RTC_SetDate(&hrtc, &DateToUpdate, RTC_FORMAT_BCD) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN RTC_Init 2 */
+
+  /* USER CODE END RTC_Init 2 */
+
 }
 
 /**
@@ -303,7 +470,7 @@ static void MX_SPI1_Init(void)
   hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi1.Init.NSS = SPI_NSS_SOFT;
-  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_16;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_256;
   hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -439,25 +606,24 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3|GPIO_PIN_8, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8, GPIO_PIN_RESET);
-  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin : PC13 */
-  GPIO_InitStruct.Pin = GPIO_PIN_13;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : PA3 */
-  GPIO_InitStruct.Pin = GPIO_PIN_3;
+  /*Configure GPIO pins : PA1 PA2 PA3 */
+  GPIO_InitStruct.Pin = GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PB12 */
+  GPIO_InitStruct.Pin = GPIO_PIN_12;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
   /*Configure GPIO pin : PA8 */
   GPIO_InitStruct.Pin = GPIO_PIN_8;
