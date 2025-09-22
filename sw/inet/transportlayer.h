@@ -40,9 +40,19 @@ struct socket {
     uint16_t port;
     uint8_t protocol;
     uint8_t state;
+    uint32_t seq;
+    uint16_t last_data_len;
+    uint32_t next_ack;
 };
 
 /* SOCK */
+uint8_t getSockState(uint8_t id);
+void sockSendData(uint8_t *buff, uint32_t len, uint8_t id);
+void prepareTransportLayer(struct inet_addr * inaddr, uint8_t *buff, uint32_t pbuff_len);
 uint8_t socketRoutine(uint8_t *buff, uint32_t len);
+uint16_t transportCalcChecksum(uint8_t *buff, uint32_t p_len);
+uint16_t getSockLastDataLen(uint8_t id);
+uint32_t getSockNextAck(uint8_t id);
+
 
 #endif

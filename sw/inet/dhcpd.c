@@ -26,7 +26,8 @@
 
 #include "dhcpd.h"
 #include "enc28j60.h"
-#include "ip_arp_udp_tcp.h"
+//#include "ip_arp_udp_tcp.h"
+#include "pkt_headers.h"
 #include "net.h"
 
 static void dhcp_send_packet(uint8_t* buf, uint32_t len, uint8_t requestType);
@@ -91,7 +92,8 @@ static uint8_t* pbuff = NULL;
 static uint32_t bufLen = 0;
 
 static inline void addToBuf(uint8_t b) { *bufPtr++ = b; };
-
+static void send_udp_prepare(uint8_t *buf,uint16_t sport, uint8_t *dip, uint16_t dport);
+static void send_udp_transmit(uint8_t *buf,uint16_t datalen);
 
 uint8_t initDhcp(struct inet_addr *addr, uint8_t * buff, uint32_t buf_len) {
   bufLen = buf_len;
@@ -201,6 +203,7 @@ void dhcp_send_packet(uint8_t* buf, uint32_t len, uint8_t requestType) {
         memcpy(buf + IP_SRC_P, (uint8_t*)&(int_addr->ipaddr), 4);
         memcpy(buf + IP_DST_P, (uint8_t*)&(int_addr->dhcpsrv), 4);
     } else {
+        memset(buf + IP_SRC_P, 0x0, 4);
         memset(buf + IP_DST_P, 0xFF, 4);
     }
     buf[UDP_DST_PORT_L_P] = DHCP_SRC_PORT;
@@ -318,7 +321,9 @@ uint8_t have_dhcpoffer(uint8_t* buf, uint16_t plen) {
             break;
         case 51:
             leaseTime = 0;
-            for (i = 0; i < 4; i++) leaseTime = (leaseTime + ptr[i]) << 8;
+            for (i = 0; i < 4; i++) {
+                leaseTime |= (ptr[i] << (8 * (3 - i)));
+            }
             leaseTime *= 1000;  // milliseconds
             int_addr->dncp_lease_time = leaseTime;
             break;
@@ -334,8 +339,8 @@ uint8_t have_dhcpoffer(uint8_t* buf, uint16_t plen) {
 
 uint8_t have_dhcpack(uint8_t* buf, uint16_t plen) {
     dhcpState = DHCP_STATE_OK;
-    leaseStart = HAL_GetTick();
-    int_addr->dncp_last_lease = leaseStart;
+    int_addr->dncp_last_lease = HAL_GetTick();
+    //printf("scheduled renew ll %ld next %ld\r\n", int_addr->dncp_last_lease, int_addr->dncp_last_lease + (int_addr->dncp_lease_time/2));
     // Turn off broadcast. Application if it needs it can re-enable it
     enc28j60DisableBroadcast();
     return 2;
@@ -344,10 +349,68 @@ uint8_t have_dhcpack(uint8_t* buf, uint16_t plen) {
 uint8_t dhcpRenew() {
     if (int_addr == NULL || dhcpState != DHCP_STATE_OK )
         return -1;
-    if (int_addr->dncp_last_lease + int_addr->dncp_lease_time < HAL_GetTick()) {
+    if (int_addr->dncp_last_lease + (int_addr->dncp_lease_time/2) < HAL_GetTick()) {
+        //printf("send req for renew\r\n");
         dhcp_send_packet(pbuff, bufLen, DHCPREQUEST);
-        dhcpState = DHCP_STATE_REQUEST;
+        //dhcpState = DHCP_STATE_REQUEST;
         int_addr->dncp_last_lease = HAL_GetTick();
     }
     return 2;
 }
+
+
+void send_udp_prepare(uint8_t *buf,uint16_t sport, uint8_t *dip, uint16_t dport)
+{
+  const char iphdr[] ={0x45,0,0,0x82,0,0,0x40,0,0x20}; // 0x82 is the total len on ip, 0x20 is ttl (time to live)
+  //memcpy(&buf[ETH_DST_MAC], int_addr->gwmacaddr, 6);
+  //memcpy(&buf[ETH_SRC_MAC], int_addr->macaddr, 6);
+  buf[ETH_TYPE_H_P] = ETHTYPE_IP_H_V;
+  buf[ETH_TYPE_L_P] = ETHTYPE_IP_L_V;
+  //fill_buf_p(9,iphdr);
+  memcpy(&buf[IP_P], iphdr, 9);
+
+  // total length field in the IP header must be set:
+  buf[IP_TOTLEN_H_P]=0;
+  // done in transmit: buf[IP_TOTLEN_L_P]=IP_HEADER_LEN+UDP_HEADER_LEN+datalen;
+  //buf[IP_PROTO_P]=IP_PROTO_UDP_V;
+  //memcpy(&buf[IP_DST_P], dip, 4);
+  //memcpy(&buf[IP_SRC_P], ipaddr, 4);
+
+  // done in transmit: fill_ip_hdr_checksum(buf);
+  buf[UDP_DST_PORT_H_P]=(dport>>8);
+  buf[UDP_DST_PORT_L_P]=0xff&dport; 
+  buf[UDP_SRC_PORT_H_P]=(sport>>8);
+  buf[UDP_SRC_PORT_L_P]=sport&0xff; 
+  buf[UDP_LEN_H_P]=0;
+  // done in transmit: buf[UDP_LEN_L_P]=UDP_HEADER_LEN+datalen;
+  // zero the checksum
+  buf[UDP_CHECKSUM_H_P]=0;
+  buf[UDP_CHECKSUM_L_P]=0;
+  // copy the data:
+  // now starting with the first byte at buf[UDP_DATA_P]
+}
+
+void send_udp_transmit(uint8_t *buf,uint16_t datalen)
+{
+  uint16_t ck;
+  buf[IP_TOTLEN_H_P]=(IP_HEADER_LEN+UDP_HEADER_LEN+datalen) >> 8;
+  buf[IP_TOTLEN_L_P]=(IP_HEADER_LEN+UDP_HEADER_LEN+datalen) & 0xff;
+  //fill_ip_hdr_checksum(buf);
+  ck = ipCalcChecksum(buf);
+  *((uint16_t *)&buf[IP_CHECKSUM_P])=ck;
+  //buf[UDP_LEN_L_P]=UDP_HEADER_LEN+datalen;
+  buf[UDP_LEN_H_P]=(UDP_HEADER_LEN+datalen) >>8;
+  buf[UDP_LEN_L_P]=(UDP_HEADER_LEN+datalen) & 0xff;
+
+  //
+  buf[UDP_CHECKSUM_H_P]=0;
+  buf[UDP_CHECKSUM_L_P]=0;
+  //ck=checksum(&buf[IP_SRC_P], 16 + datalen,1);
+  ck = transportCalcChecksum(buf, ETH_HDR_BASE_LEN + IP_HDR_BASE_LEN + 8 + datalen); // ACK packet have no data
+  *((uint16_t *)&buf[UDP_CHECKSUM_H_P])=ck;
+  //buf[UDP_CHECKSUM_H_P]=ck>>8;
+  //buf[UDP_CHECKSUM_L_P]=ck& 0xff;
+  enc28j60PacketSend(UDP_HEADER_LEN+IP_HEADER_LEN+ETH_HEADER_LEN+datalen,buf);
+}
+
+
