@@ -24,6 +24,7 @@
 /* USER CODE BEGIN Includes */
 #include "enc28j60.h"
 #include "iplayer.h"
+#include "transportlayer.h"
 #include "dhcpd.h"
 #include "net.h"
 #include <stdio.h>
@@ -50,6 +51,8 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+ADC_HandleTypeDef hadc1;
+
 RTC_HandleTypeDef hrtc;
 
 SPI_HandleTypeDef hspi1;
@@ -72,6 +75,7 @@ static long lastDhcpRequest = 0;
 #define PBUFF_LEN 400
 static uint8_t pbuf[PBUFF_LEN] = {0};
 static uint16_t plen = 0;
+static char * fpass = "1234";
 
 // SD CARD
 uint8_t sect[512];
@@ -94,6 +98,7 @@ static void MX_USB_PCD_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_RTC_Init(void);
+static void MX_ADC1_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -119,13 +124,13 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
         HAL_UART_Transmit(huart, inbuff, 1, 100);
         if (inbuff[0] == 0x0d) { // enter
             HAL_UART_Transmit(huart, "\n", 1, 100);
-            //HAL_UART_Transmit(huart, cmd, cmd_ptr, 100);
-            cmd_process(cmd, cmd_ptr);
-            memset(cmd, 0, CMD_MAX_LEN);
-            cmd_ptr = 0;
+            if (cmd_ptr != 0) {
+                cmd_process(cmd, cmd_ptr);
+                memset(cmd, 0, CMD_MAX_LEN);
+                cmd_ptr = 0;
+            }
             HAL_UART_Transmit(huart, "--#> ", 6, HAL_MAX_DELAY);
         } else {
-            //printf("GOT KEY=%x (len=%d)\n\r",inbuff[0], cmd_ptr);
             cmd[cmd_ptr] = inbuff[0];
 			if (cmd_ptr < CMD_MAX_LEN-1)
 				cmd_ptr++;
@@ -177,6 +182,7 @@ int main(void)
   MX_USART1_UART_Init();
   MX_SPI1_Init();
   MX_RTC_Init();
+  MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
   printf("Hello from BCModule ver.%d\r\n\r\n", SW_VER);
   printf("Init system...\r\n");
@@ -296,11 +302,11 @@ int main(void)
   //enc28j60DisableBroadcast();
   //enc28j60DisableMulticast();
   
-  uint8_t bbuff[] = "HERE IS ONE PACKEttttttttttttttttttttttttttttttttttttttttttTTTTTTTTTTT";
+  /*uint8_t bbuff[] = "HERE IS ONE PACKEttttttttttttttttttttttttttttttttttttttttttTTTTTTTTTTT";
 
   memcpy(bbuff + ETH_SRC_MAC, mac, 6);
   memset(bbuff + ETH_DST_MAC, 0xFF, 6);
-  enc28j60PacketSend(40, bbuff);
+  enc28j60PacketSend(40, bbuff);*/
 
   lastDhcpRequest = HAL_GetTick();
   memcpy(net_addr.macaddr, mac, 6);
@@ -309,6 +315,13 @@ int main(void)
           net_addr.macaddr[4], net_addr.macaddr[5]);
   initDhcp(&net_addr, pbuf, PBUFF_LEN);
   prepareIpLayer(&net_addr, pbuf, PBUFF_LEN);
+  prepareTransportLayer(&net_addr, pbuf, PBUFF_LEN);
+
+  ftpd_set_user_password(fpass);
+  ftpd_set_cmd_sock(2);
+  ftpd_set_data_sock(1);
+  ftpdSetAddr(&net_addr);
+
   printf(
           "\tIP address: %d.%d.%d.%d\r\n"
           "\tIP netmask: %d.%d.%d.%d\r\n"
@@ -327,16 +340,21 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_12);
 
     // Network routine
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_SET);
     plen = enc28j60PacketReceive(PBUFF_LEN, pbuf);
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_RESET);
     if(arpCheckAndReply(pbuf, plen))
         continue;
 
     if(icmpCheckAndReply(pbuf, plen))
         continue;
 
+    if (socketRoutine(pbuf, plen))
+        continue;
+
+    ftpd_routine(pbuf, plen);
     dhcpRenew();
     HAL_Delay(10);
     /* USER CODE END WHILE */
@@ -385,13 +403,62 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
-  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_RTC|RCC_PERIPHCLK_USB;
+  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_RTC|RCC_PERIPHCLK_ADC
+                              |RCC_PERIPHCLK_USB;
   PeriphClkInit.RTCClockSelection = RCC_RTCCLKSOURCE_LSE;
+  PeriphClkInit.AdcClockSelection = RCC_ADCPCLK2_DIV6;
   PeriphClkInit.UsbClockSelection = RCC_USBCLKSOURCE_PLL_DIV1_5;
   if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
   {
     Error_Handler();
   }
+}
+
+/**
+  * @brief ADC1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_ADC1_Init(void)
+{
+
+  /* USER CODE BEGIN ADC1_Init 0 */
+
+  /* USER CODE END ADC1_Init 0 */
+
+  ADC_ChannelConfTypeDef sConfig = {0};
+
+  /* USER CODE BEGIN ADC1_Init 1 */
+
+  /* USER CODE END ADC1_Init 1 */
+
+  /** Common config
+  */
+  hadc1.Instance = ADC1;
+  hadc1.Init.ScanConvMode = ADC_SCAN_DISABLE;
+  hadc1.Init.ContinuousConvMode = DISABLE;
+  hadc1.Init.DiscontinuousConvMode = DISABLE;
+  hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+  hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
+  hadc1.Init.NbrOfConversion = 1;
+  if (HAL_ADC_Init(&hadc1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Regular Channel
+  */
+  sConfig.Channel = ADC_CHANNEL_TEMPSENSOR;
+  sConfig.Rank = ADC_REGULAR_RANK_1;
+  sConfig.SamplingTime = ADC_SAMPLETIME_1CYCLE_5;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN ADC1_Init 2 */
+
+  /* USER CODE END ADC1_Init 2 */
+
 }
 
 /**

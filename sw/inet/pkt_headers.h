@@ -171,6 +171,18 @@
 #define IP_PROTO_TYPE_L2TP 0x73	//115	L2TP	Layer Two Tunneling Protocol Version 3	RFC 3931
 #define IP_PROTO_TYPE_RESERVED 0xFF	//255	Reserved
 
+// TCP FLAGS Network order
+#define TCP_HEADER_LEN (1 >> 4)
+#define TCP_FLAG_FIN (1 << 8)
+#define TCP_FLAG_SYN (1 << 9)
+#define TCP_FLAG_RST (1 << 10)
+#define TCP_FLAG_PSH (1 << 11)
+#define TCP_FLAG_ACK (1 << 12)
+#define TCP_FLAG_URG (1 << 13)
+#define TCP_FLAG_ECH (1 << 14)
+#define TCP_FLAG_CWR (1 << 15)
+#define TCP_FLAG_ECN (1 << 0)
+
 struct eth_header {
 	uint8_t dst_mac[6];
 	uint8_t src_mac[6];
@@ -227,6 +239,10 @@ inline struct eth_header* map_eth_header(uint8_t* buff) {
 
 inline struct ip_header* map_ip_header(uint8_t* buff) {
     return (struct ip_header*)(buff+sizeof(struct eth_header));
+}
+
+inline struct tcpip_header* map_tcpip_header(uint8_t* buff) {
+    return (struct tcpip_header*)(buff+sizeof(struct eth_header)+sizeof(struct ip_header));
 }
 
 inline uint8_t* get_pkt_data(uint8_t* buff, const struct ip_header* iphd) {

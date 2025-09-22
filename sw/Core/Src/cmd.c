@@ -97,14 +97,12 @@ void print_version(char *cmd) {
 void print_date(char *cmd) {
   RTC_TimeTypeDef sTime;
   RTC_DateTypeDef sDate;
-  if (HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN) != HAL_OK)
+  if (HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN) != HAL_OK 
+          || HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN) != HAL_OK)
   {
-      //Error_Handler();
+      printf("Internal error\r\n");
+      return;
   }
-  if (HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN) != HAL_OK)
-  {
-      //Error_Handler();
-  }
-  printf("System time is set to %02d-%02d-20%02d %02d:%02d:%02d\r\n", sDate.Date, sDate.Month, sDate.Year,
+  printf("System time is %02d-%02d-20%02d %02d:%02d:%02d\r\n", sDate.Date, sDate.Month, sDate.Year,
           sTime.Hours, sTime.Minutes, sTime.Seconds);
 }

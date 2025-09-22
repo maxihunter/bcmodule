@@ -37,8 +37,8 @@ static struct inet_addr *int_addr;
 
 void fillEthHeader(uint8_t *buff, uint32_t len, struct inet_addr * inaddr, uint8_t *dstmac, uint16_t ethtype) {
 	struct eth_header* eth = map_eth_header(buff);
-	memcpy((uint8_t*)&(eth->src_mac), inaddr->macaddr, 6);
 	memcpy((uint8_t*)&(eth->dst_mac), dstmac, 6);
+	memcpy((uint8_t*)&(eth->src_mac), inaddr->macaddr, 6);
 	eth->ethertype = ethtype;
 }
 

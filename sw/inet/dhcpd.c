@@ -92,7 +92,6 @@ static uint32_t bufLen = 0;
 
 static inline void addToBuf(uint8_t b) { *bufPtr++ = b; };
 
-
 uint8_t initDhcp(struct inet_addr *addr, uint8_t * buff, uint32_t buf_len) {
   bufLen = buf_len;
   int_addr = addr;
@@ -318,7 +317,9 @@ uint8_t have_dhcpoffer(uint8_t* buf, uint16_t plen) {
             break;
         case 51:
             leaseTime = 0;
-            for (i = 0; i < 4; i++) leaseTime = (leaseTime + ptr[i]) << 8;
+            for (i = 0; i < 4; i++) {
+                leaseTime |= (ptr[i] << (8 * (3 - i)));
+            }
             leaseTime *= 1000;  // milliseconds
             int_addr->dncp_lease_time = leaseTime;
             break;
@@ -334,8 +335,8 @@ uint8_t have_dhcpoffer(uint8_t* buf, uint16_t plen) {
 
 uint8_t have_dhcpack(uint8_t* buf, uint16_t plen) {
     dhcpState = DHCP_STATE_OK;
-    leaseStart = HAL_GetTick();
-    int_addr->dncp_last_lease = leaseStart;
+    int_addr->dncp_last_lease = HAL_GetTick();
+    //printf("scheduled renew ll %ld next %ld\r\n", int_addr->dncp_last_lease, int_addr->dncp_last_lease + (int_addr->dncp_lease_time/2));
     // Turn off broadcast. Application if it needs it can re-enable it
     enc28j60DisableBroadcast();
     return 2;
@@ -344,9 +345,10 @@ uint8_t have_dhcpack(uint8_t* buf, uint16_t plen) {
 uint8_t dhcpRenew() {
     if (int_addr == NULL || dhcpState != DHCP_STATE_OK )
         return -1;
-    if (int_addr->dncp_last_lease + int_addr->dncp_lease_time < HAL_GetTick()) {
+    if (int_addr->dncp_last_lease + (int_addr->dncp_lease_time/2) < HAL_GetTick()) {
+        //printf("send req for renew\r\n");
         dhcp_send_packet(pbuff, bufLen, DHCPREQUEST);
-        dhcpState = DHCP_STATE_REQUEST;
+        //dhcpState = DHCP_STATE_REQUEST;
         int_addr->dncp_last_lease = HAL_GetTick();
     }
     return 2;
