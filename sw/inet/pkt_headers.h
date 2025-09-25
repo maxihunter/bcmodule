@@ -183,6 +183,11 @@
 #define TCP_FLAG_CWR (1 << 15)
 #define TCP_FLAG_ECN (1 << 0)
 
+#define TCP_HDR_BASE_LEN sizeof(struct tcpip_header)
+#define IP_HDR_BASE_LEN sizeof(struct ip_header)
+#define ETH_HDR_BASE_LEN sizeof(struct eth_header)
+#define ETH_IP_TCP_HDR_BASE_LEN (TCP_HDR_BASE_LEN+IP_HDR_BASE_LEN+ETH_HDR_BASE_LEN)
+
 struct eth_header {
 	uint8_t dst_mac[6];
 	uint8_t src_mac[6];

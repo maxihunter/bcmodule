@@ -351,8 +351,8 @@ int main(void)
     if(icmpCheckAndReply(pbuf, plen))
         continue;
 
-    if (socketRoutine(pbuf, plen))
-        continue;
+   /* if (socketRoutine(pbuf, plen))
+        continue;*/
 
     ftpd_routine(pbuf, plen);
     dhcpRenew();

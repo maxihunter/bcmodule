@@ -51,6 +51,10 @@ uint8_t getSockState(uint8_t id) {
     return socks[id].state;
 }
 
+uint8_t getSockSeq(uint8_t id) {
+    return socks[id].seq;
+}
+
 uint8_t socketRoutine(uint8_t *buff, uint32_t len) {
     if (len < 60)
         return 0;
@@ -73,9 +77,9 @@ uint8_t socketRoutine(uint8_t *buff, uint32_t len) {
             i++;
             continue;
         }
-        printf("RUN SOCK %c, f=%x\r\n", '0' + i, tcphdr->flags);
+        //printf("RUN SOCK %c, f=%x\r\n", '0' + i, tcphdr->flags);
         if ( (socks[i].state == SOCK_LISTEN || socks[i].state == SOCK_SYN) && tcphdr->flags & TCP_FLAG_SYN) {
-            printf("RUN SOCK %d SYN s=%x\r\n", '0' + i, tcphdr->sequence);
+            //printf("RUN SOCK %d SYN s=%x\r\n", '0' + i, tcphdr->sequence);
             socks[i].state = SOCK_SYN;
             memcpy((uint8_t*)&(eth->dst_mac), eth->src_mac, 6);
             memcpy((uint8_t*)&(eth->src_mac), int_addr->macaddr, 6);
@@ -88,14 +92,17 @@ uint8_t socketRoutine(uint8_t *buff, uint32_t len) {
             tcphdr->flags |= TCP_FLAG_ACK;
             tcphdr->window = 2920; // make window size double of standard MTU 2 x 1460
             tcphdr->ack_num = tcphdr->sequence + 0x01000000; // +1 in network order
-                                               //0xd2fb4eed
                                                //
-            socks[i].seq = HAL_GetTick();
+            socks[i].seq = HAL_GetTick() << 16;
             tcphdr->sequence = socks[i].seq;
+            socks[i].seq += 0x01000000; // +1 in network order
+            tcphdr->checksum = 0;
+            tcphdr->checksum = calcChecksum(buff, len);
             enc28j60PacketSend(len,buff);
             return i;
         }
         if ( socks[i].state == SOCK_SYN && (tcphdr->flags & TCP_FLAG_ACK) && !(tcphdr->flags & TCP_FLAG_PSH)) {
+            //printf("RUN SOCK %c ESTTT s=\r\n", '0' + i);
             socks[i].state = SOCK_ESTABLISHED;
             return i;
         }
@@ -111,7 +118,9 @@ uint8_t socketRoutine(uint8_t *buff, uint32_t len) {
             tcphdr->flags |= TCP_FLAG_ACK;
 
             tcphdr->window = 2920; // make window size double of standard MTU 2 x 1460
-            tcphdr->sequence = socks[i].seq;
+            tcphdr->sequence = socks[i].seq; //TCP_HDR_BASE_LEN
+            tcphdr->checksum = 0;
+            tcphdr->checksum = calcChecksum(buff, len);
             enc28j60PacketSend(len,buff);
             return i;
         }
@@ -129,3 +138,31 @@ uint8_t socketRoutine(uint8_t *buff, uint32_t len) {
     return 0;
 }
 
+uint16_t calcChecksum(uint8_t *buff, uint32_t p_len) {
+    uint32_t chcksum = 0;
+    uint16_t res = 0;
+    struct ip_header* iphdr = map_ip_header(buff);
+    uint16_t buff_pos = ETH_HDR_BASE_LEN + (uint32_t)(&(((struct ip_header*)0)->src_ip));
+    uint16_t chck_len = p_len - buff_pos;
+
+    chcksum += iphdr->protocol;
+    chcksum += chck_len - 8;
+    while (buff_pos < p_len - 1) {
+        //chcksum += *((uint16_t *)(buff + buff_pos)); // sht, need normal order, not network order...
+        //printf("pos=%x;buf=%x;cch1=%x\r\n", buff_pos, *(buff+buff_pos), chcksum );
+        chcksum += 0xFFFF & (((uint32_t)*(buff+buff_pos)<<8)|*(buff+1+buff_pos));
+        buff_pos += 2;
+    }
+    if(buff_pos == chck_len - 1) {
+        //printf("ex_pos=%x;buf=%x;cch1=%x\r\n", buff_pos, *(buff+buff_pos), chcksum );
+        chcksum += 0xff00 & (*(buff + buff_pos+1) << 8);
+    }
+    while (chcksum >> 16) {
+        chcksum = (chcksum & 0xffff) + (chcksum >> 16);
+    }
+    //printf("cch1=%x\r\n", ((uint16_t) chcksum ^ 0xFFFF));
+    chcksum = (chcksum ^ 0xFFFF);
+    res =  (chcksum << 8) | (chcksum >> 8);
+
+    return res;
+}

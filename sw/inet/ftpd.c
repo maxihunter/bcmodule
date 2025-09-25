@@ -105,12 +105,16 @@ void ftpdSetAddr(struct inet_addr * inaddr) {
 
 uint8_t ftpd_routine(uint8_t * buff, uint32_t len) {
     uint8_t sockid = socketRoutine(buff, len);
-    if (sockid == 0)
+    if (sockid == 0) {
         return 0;
+    }
+    uint8_t ppp = getSockState(sockid);
+    //printf("ss=%d\r\n", ppp);
     if(getSockState(sockid) != SOCK_ESTABLISHED) {
         return 0;
     }
     
+    //printf("ESTABBbbblish\r\n");
     struct eth_header* eth = map_eth_header(buff);
     struct ip_header* iphdr = map_ip_header(buff);
     struct tcpip_header* tcphdr = map_tcpip_header(buff);
@@ -120,13 +124,22 @@ uint8_t ftpd_routine(uint8_t * buff, uint32_t len) {
 
     memcpy((uint8_t*)&(iphdr->dst_ip), (uint8_t*)&(iphdr->src_ip), 4);
     memcpy((uint8_t*)&(iphdr->src_ip), (uint8_t*)&(int_addr->ipaddr), 4);
+
+    iphdr->total_len = 0x3400; // 52 in network order
+
     uint16_t dp = tcphdr->dport;
     tcphdr->dport = tcphdr->sport;
     tcphdr->sport = dp;
     tcphdr->flags |= TCP_FLAG_ACK | TCP_FLAG_PSH;
-    
-    tcphdr->window = 502;
-    memcpy((uint8_t*)(iphdr)+sizeof(struct tcpip_header), "220 bcmFTP\r\n", 12);
-    enc28j60PacketSend(sizeof(struct eth_header)+sizeof(struct ip_header)+sizeof(struct tcpip_header) + 12,buff);
+
+    uint32_t ack = tcphdr->ack_num;
+    tcphdr->ack_num = tcphdr->sequence;
+    tcphdr->sequence = ack;
+
+    tcphdr->window = 0xf601; // 502 NBO;
+    memcpy((uint8_t*)(tcphdr)+TCP_HDR_BASE_LEN, "220 bcmFTP\r\n", 12);
+    tcphdr->checksum = 0;
+    tcphdr->checksum = calcChecksum(buff, ETH_IP_TCP_HDR_BASE_LEN + 12);
+    enc28j60PacketSend(ETH_IP_TCP_HDR_BASE_LEN + 12,buff);
 }
 
