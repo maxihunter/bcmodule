@@ -48,6 +48,7 @@ void fillEthHeaderBroadcast(uint8_t *buff, uint32_t len, struct inet_addr * inad
 /* IP */
 void prepareIpLayer(struct inet_addr * inaddr, uint8_t *buff, uint32_t pbuff_len);
 inline uint8_t isHostInLocalNetwork(uint32_t hostaddr, struct inet_addr * inaddr);
+uint16_t ipCalcChecksum(uint8_t *buff);
 
 /* ARP */
 uint8_t arpCheckAndReply(uint8_t *buff, uint32_t len);

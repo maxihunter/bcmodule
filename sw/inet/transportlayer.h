@@ -47,7 +47,7 @@ struct socket {
 uint8_t getSockState(uint8_t id);
 void prepareTransportLayer(struct inet_addr * inaddr, uint8_t *buff, uint32_t pbuff_len);
 uint8_t socketRoutine(uint8_t *buff, uint32_t len);
-uint16_t calcChecksum(uint8_t *buff, uint32_t pbuff_len);
+uint16_t transportCalcChecksum(uint8_t *buff, uint32_t p_len);
 
 
 #endif

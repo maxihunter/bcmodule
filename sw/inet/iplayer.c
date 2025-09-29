@@ -188,3 +188,25 @@ uint8_t icmpCheckAndReply(uint8_t *buff, uint32_t len) {
 	return 1;
 }
 
+uint16_t ipCalcChecksum(uint8_t *buff) {
+    uint32_t chcksum = 0;
+    uint16_t res = 0;
+    uint16_t buff_pos = ETH_HDR_BASE_LEN;
+    uint16_t chck_len = buff_pos + IP_HDR_BASE_LEN; // TODO there could be ip options but we don't use it
+
+    while (buff_pos < chck_len) {
+        //chcksum += *((uint16_t *)(buff + buff_pos)); // sht, need normal order, not network order...
+        //printf("pos=%x;buf=%x;cch1=%x\r\n", buff_pos, *(buff+buff_pos), chcksum );
+        chcksum += 0xFFFF & (((uint32_t)*(buff+buff_pos)<<8)|*(buff+1+buff_pos));
+        buff_pos += 2;
+    }
+    while (chcksum >> 16) {
+        //printf("cch1=%x\r\n", chcksum);
+        chcksum = (chcksum & 0xffff) + (chcksum >> 16);
+    }
+    //printf("cch1=%x\r\n", ((uint16_t) chcksum ^ 0xFFFF));
+    chcksum = (chcksum ^ 0xFFFF);
+    res =  (chcksum << 8) | (chcksum >> 8);
+
+    return res;
+}

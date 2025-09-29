@@ -110,6 +110,10 @@ int _write(int file, char *ptr, int len)
     HAL_StatusTypeDef hstatus;
 
     if (file == 1 || file == 2) {
+        uint16_t st = 0;
+        /*do {
+            st = HAL_UART_GetState(&huart1);
+        } while (!(st & ( HAL_UART_STATE_READY)));*/
         hstatus = HAL_UART_Transmit(&huart1, (uint8_t*) ptr, len, HAL_MAX_DELAY);
         if (hstatus == HAL_OK)
             return len;
@@ -129,7 +133,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
                 memset(cmd, 0, CMD_MAX_LEN);
                 cmd_ptr = 0;
             }
-            HAL_UART_Transmit(huart, "--#> ", 6, HAL_MAX_DELAY);
+            HAL_UART_Transmit_IT(huart, "--#> ", 6);
         } else {
             cmd[cmd_ptr] = inbuff[0];
 			if (cmd_ptr < CMD_MAX_LEN-1)

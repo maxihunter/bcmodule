@@ -139,7 +139,7 @@ uint8_t ftpd_routine(uint8_t * buff, uint32_t len) {
     tcphdr->window = 0xf601; // 502 NBO;
     memcpy((uint8_t*)(tcphdr)+TCP_HDR_BASE_LEN, "220 bcmFTP\r\n", 12);
     tcphdr->checksum = 0;
-    tcphdr->checksum = calcChecksum(buff, ETH_IP_TCP_HDR_BASE_LEN + 12);
+    tcphdr->checksum = transportCalcChecksum(buff, ETH_IP_TCP_HDR_BASE_LEN + 12);
     enc28j60PacketSend(ETH_IP_TCP_HDR_BASE_LEN + 12,buff);
 }
 

@@ -80,25 +80,49 @@ uint8_t socketRoutine(uint8_t *buff, uint32_t len) {
         //printf("RUN SOCK %c, f=%x\r\n", '0' + i, tcphdr->flags);
         if ( (socks[i].state == SOCK_LISTEN || socks[i].state == SOCK_SYN) && tcphdr->flags & TCP_FLAG_SYN) {
             //printf("RUN SOCK %d SYN s=%x\r\n", '0' + i, tcphdr->sequence);
+#if 0
+            make_tcp_synack_from_syn(buff);
+#else
             socks[i].state = SOCK_SYN;
             memcpy((uint8_t*)&(eth->dst_mac), eth->src_mac, 6);
             memcpy((uint8_t*)&(eth->src_mac), int_addr->macaddr, 6);
 
             memcpy((uint8_t*)&(iphdr->dst_ip), (uint8_t*)&(iphdr->src_ip), 4);
             memcpy((uint8_t*)&(iphdr->src_ip), (uint8_t*)&(int_addr->ipaddr), 4);
+            iphdr->total_len = 0x2c00; // 52 in network order
+            iphdr->id = 0;
+            iphdr->checksum = ipCalcChecksum(buff);
 
             tcphdr->dport = tcphdr->sport;
             tcphdr->sport = socks[i].port;
-            tcphdr->flags |= TCP_FLAG_ACK;
-            tcphdr->window = 2920; // make window size double of standard MTU 2 x 1460
+            tcphdr->flags = 0x0060;
+            tcphdr->flags |= TCP_FLAG_SYN | TCP_FLAG_ACK;
+            tcphdr->window = 0x0005; // make window size double of standard MTU 1280
             tcphdr->ack_num = tcphdr->sequence + 0x01000000; // +1 in network order
                                                //
             socks[i].seq = HAL_GetTick() << 16;
             tcphdr->sequence = socks[i].seq;
             socks[i].seq += 0x01000000; // +1 in network order
+            buff[ETH_IP_TCP_HDR_BASE_LEN]=2;
+            buff[ETH_IP_TCP_HDR_BASE_LEN+1]=4;
+            buff[ETH_IP_TCP_HDR_BASE_LEN+2]=0x05;
+            buff[ETH_IP_TCP_HDR_BASE_LEN+3]=0x0;
+
+            /*
+            buff[ETH_IP_TCP_HDR_BASE_LEN+4]=0x01;
+            buff[ETH_IP_TCP_HDR_BASE_LEN+5]=0x01;
+
+            buff[ETH_IP_TCP_HDR_BASE_LEN+6]=0x01;
+            buff[ETH_IP_TCP_HDR_BASE_LEN+7]=0x01;
+            buff[ETH_IP_TCP_HDR_BASE_LEN+8]=0x01;
+            buff[ETH_IP_TCP_HDR_BASE_LEN+9]=0x01;
+            buff[ETH_IP_TCP_HDR_BASE_LEN+10]=0x01;
+            buff[ETH_IP_TCP_HDR_BASE_LEN+11]=0x01;*/
             tcphdr->checksum = 0;
-            tcphdr->checksum = calcChecksum(buff, len);
-            enc28j60PacketSend(len,buff);
+            tcphdr->checksum = transportCalcChecksum(buff, ETH_IP_TCP_HDR_BASE_LEN+4);
+
+            enc28j60PacketSend(ETH_IP_TCP_HDR_BASE_LEN+4,buff);
+#endif
             return i;
         }
         if ( socks[i].state == SOCK_SYN && (tcphdr->flags & TCP_FLAG_ACK) && !(tcphdr->flags & TCP_FLAG_PSH)) {
@@ -120,7 +144,7 @@ uint8_t socketRoutine(uint8_t *buff, uint32_t len) {
             tcphdr->window = 2920; // make window size double of standard MTU 2 x 1460
             tcphdr->sequence = socks[i].seq; //TCP_HDR_BASE_LEN
             tcphdr->checksum = 0;
-            tcphdr->checksum = calcChecksum(buff, len);
+            tcphdr->checksum = transportCalcChecksum(buff, len);
             enc28j60PacketSend(len,buff);
             return i;
         }
@@ -138,7 +162,7 @@ uint8_t socketRoutine(uint8_t *buff, uint32_t len) {
     return 0;
 }
 
-uint16_t calcChecksum(uint8_t *buff, uint32_t p_len) {
+uint16_t transportCalcChecksum(uint8_t *buff, uint32_t p_len) {
     uint32_t chcksum = 0;
     uint16_t res = 0;
     struct ip_header* iphdr = map_ip_header(buff);
