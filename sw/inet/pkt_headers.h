@@ -198,6 +198,8 @@ struct eth_header {
 #define IP_HDR_GET_VERS(x) ( x >> 4 )
 #define IP_HDR_GET_IHL(x) ( x & 0x0f )
 
+#define INT16_ITON(x) ( ( (x) << 8 ) | ( (x) >> 8 ) )
+
 struct ip_header {
 	uint8_t version_ihl;
 	uint8_t dscp_ecn;

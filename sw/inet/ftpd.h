@@ -47,7 +47,7 @@
 
 enum ftp_cmd {
 	USER_CMD,
-	ACCT_CMD,
+//	ACCT_CMD,
 	PASS_CMD,
 	TYPE_CMD,
 	LIST_CMD,
@@ -80,9 +80,11 @@ enum ftp_cmd {
 };
 
 struct ftp_data {
-    char * username;
+    char username[4];
     unsigned long last_seen;
     char * curr_dir;
+    uint8_t seen;
+    uint8_t authorized;
     uint8_t curr_cmd;
     uint8_t curr_state;
     uint8_t data_transfer;

@@ -30,62 +30,91 @@
 #include <stdbool.h>
 #include <string.h>
 
-#define FTP_USERNAME "bcm"
+#define FTP_USERNAME "bcmu"
+#define FTP_PASSWORD "1234"
 
 struct ftpd_cmd {
     char * name;
     uint8_t id;
 };
+struct ftp_data ftp_user = {0};
+
+    /*char username[4];
+    unsigned long last_seen;
+    char * curr_dir;
+    uint8_t seen;
+    uint8_t authorized;
+    uint8_t curr_cmd;
+    uint8_t curr_state;
+    uint8_t data_transfer;
+};*/
 
 static uint8_t cmd_sock = 0;
 static uint8_t data_sock = 0;
 static struct inet_addr *int_addr = NULL;
+//static uint16_t recv_data_len = 0;
 
 struct ftpd_cmd ftp_cmd_list[] = {
     {"USER", USER_CMD},
-    {"USER", ACCT_CMD},
-    {"USER", PASS_CMD},
-    {"USER", TYPE_CMD},
-    {"USER", LIST_CMD},
-    {"USER", CWD_CMD},
-    {"USER", DELE_CMD},
-    {"USER", NAME_CMD},
-    {"USER", QUIT_CMD},
-    {"USER", RETR_CMD},
-    {"USER", STOR_CMD},
-    {"USER", PORT_CMD},
-    {"USER", NLST_CMD},
-    {"USER", PWD_CMD},
-    {"USER", XPWD_CMD},
-    {"USER", MKD_CMD},
-    {"USER", XMKD_CMD},
-    {"USER", XRMD_CMD},
-    {"USER", RMD_CMD},
-    {"USER", STRU_CMD},
-    {"USER", MODE_CMD},
-    {"USER", SYST_CMD},
-    {"USER", XMD5_CMD},
-    {"USER", XCWD_CMD},
-    {"USER", FEAT_CMD},
-    {"USER", PASV_CMD},
-    {"USER", SIZE_CMD},
-    {"USER", MLSD_CMD},
-    {"USER", APPE_CMD},
-    {"USER", NO_CMD},
+    //{"ACCR", ACCT_CMD},
+    {"PASS", PASS_CMD},
+    {"TYPE", TYPE_CMD},
+    {"LIST", LIST_CMD},
+    {"CWD", CWD_CMD},
+    {"DELE", DELE_CMD},
+    {"NAME", NAME_CMD},
+    {"QUIT", QUIT_CMD},
+    {"RETR", RETR_CMD},
+    {"STOR", STOR_CMD},
+    {"PORT", PORT_CMD},
+    {"NLST", NLST_CMD},
+    {"PWD", PWD_CMD},
+    {"XPWD", XPWD_CMD},
+    {"MKD", MKD_CMD},
+    {"XMKD", XMKD_CMD},
+    {"XRMD", XRMD_CMD},
+    {"RMD", RMD_CMD},
+    {"STRU", STRU_CMD},
+    {"MODE", MODE_CMD},
+    {"SYST", SYST_CMD},
+    {"XMDS", XMD5_CMD},
+    {"XCWD", XCWD_CMD},
+    {"FEAT", FEAT_CMD},
+    {"PASV", PASV_CMD},
+    {"SIZE", SIZE_CMD},
+    {"MLSD", MLSD_CMD},
+    {"APPE", APPE_CMD},
+    {"NO", NO_CMD},
     { NULL , MAX_CMD},
 };
 
 static const char * passwd = NULL;
 
-static struct ftp_data ftp_db;
 /*struct ftp_data {
     char * username;
     unsigned long last_seen;
     char * curr_dir;
+    uint8_t seen;
+    uint8_t authorized;
     uint8_t curr_cmd;
     uint8_t curr_state;
     uint8_t data_transfer;
 };*/
+
+void ftpd_sendGreeting(uint8_t *buff, uint32_t p_len, uint8_t id);
+void ftpd_sendCredRequired(uint8_t *buff, uint32_t p_len, uint8_t id);
+void ftpd_sendPassRequired(uint8_t *buff, uint32_t p_len, uint8_t id);
+uint8_t ftpd_getCMD(uint8_t *buff, uint32_t p_len);
+
+static inline uint8_t ftpd_4bcmp(uint8_t *cmd1, uint8_t *cmd2) {
+    if ( *(cmd1) == *(cmd2)
+        && *(cmd1+1) == *(cmd2+1)
+        && *(cmd1+2) == *(cmd2+2)
+        && *(cmd1+3) == *(cmd2+3))
+        return 1;
+    return 0;
+}
+
 
 void ftpd_set_user_password(const char * pass) {
     passwd = pass;
@@ -108,13 +137,50 @@ uint8_t ftpd_routine(uint8_t * buff, uint32_t len) {
     if (sockid == 0) {
         return 0;
     }
-    uint8_t ppp = getSockState(sockid);
+    //uint8_t ppp = getSockState(sockid);
     //printf("ss=%d\r\n", ppp);
     if(getSockState(sockid) != SOCK_ESTABLISHED) {
         return 0;
     }
     
     //printf("ESTABBbbblish\r\n");
+    if (!ftp_user.seen) {
+        ftpd_sendGreeting(buff, len, sockid);
+        ftp_user.seen = 1;
+        return 1;
+    }
+    if (!ftp_user.authorized) {
+        uint8_t cmd = ftpd_getCMD(buff, len);
+        if (cmd != USER_CMD && cmd != PASS_CMD) {
+            ftpd_sendCredRequired(buff, len, sockid);
+            return 1;
+        }
+        if (cmd == USER_CMD) {
+            ftp_user.username[0] = buff[ETH_IP_TCP_HDR_BASE_LEN + 0xb + 0];
+            ftp_user.username[1] = buff[ETH_IP_TCP_HDR_BASE_LEN + 0xb + 1];
+            ftp_user.username[2] = buff[ETH_IP_TCP_HDR_BASE_LEN + 0xb + 2];
+            ftp_user.username[3] = buff[ETH_IP_TCP_HDR_BASE_LEN + 0xb + 3];
+            ftpd_sendPassRequired(buff, len, sockid);
+            return 1;
+        }
+        if (cmd == PASS_CMD) {
+            // no login yet
+            if (ftp_user.username[0] == 0) {
+                ftpd_sendCredRequired(buff, len, sockid);
+                return 1;
+            }
+            if(!ftpd_4bcmp(FTP_USERNAME, ftp_user.username) ||
+                !ftpd_4bcmp(FTP_PASSWORD, buff[ETH_IP_TCP_HDR_BASE_LEN + 0xb])) {
+                HAL_Delay(1000);
+                ftpd_sendCredRequired(buff, len, sockid);
+                return 1;
+            }
+        }
+    }
+    return 0;
+}
+
+static void ftpd_prepareHeaders(uint8_t *buff, uint32_t p_len, uint16_t data_len, uint8_t id) {
     struct eth_header* eth = map_eth_header(buff);
     struct ip_header* iphdr = map_ip_header(buff);
     struct tcpip_header* tcphdr = map_tcpip_header(buff);
@@ -125,21 +191,86 @@ uint8_t ftpd_routine(uint8_t * buff, uint32_t len) {
     memcpy((uint8_t*)&(iphdr->dst_ip), (uint8_t*)&(iphdr->src_ip), 4);
     memcpy((uint8_t*)&(iphdr->src_ip), (uint8_t*)&(int_addr->ipaddr), 4);
 
-    iphdr->total_len = 0x3400; // 52 in network order
+    //iphdr->total_len = 0x3400; // 52 in network order INT16_ITON
+    iphdr->total_len = INT16_ITON(40+data_len); 
 
+    iphdr->checksum = 0;
+    iphdr->checksum = ipCalcChecksum(buff);
     uint16_t dp = tcphdr->dport;
     tcphdr->dport = tcphdr->sport;
     tcphdr->sport = dp;
     tcphdr->flags |= TCP_FLAG_ACK | TCP_FLAG_PSH;
 
+    //uint16_t ldata = getSockLastDataLen(id);
     uint32_t ack = tcphdr->ack_num;
-    tcphdr->ack_num = tcphdr->sequence;
+    /*uint8_t *ack_ptr = (uint8_t*)&(tcphdr->sequence);
+    uint8_t *ld_ptr = (uint8_t*)&(ldata);
+    uint8_t overfl = 0;
+
+    if (*(ack_ptr+3) + *(ld_ptr) > 255) {
+        overfl = 1;
+    }
+    *(ack_ptr+3) += *(ld_ptr);
+    if (*(ack_ptr+2) + *(ld_ptr+1) + overfl > 255) {
+        if (*(ack_ptr+1) == 255)
+            *(ack_ptr) += 1;
+        *(ack_ptr+1) += 1;
+    }
+    tcphdr->ack_num = tcphdr->sequence;*/
+    tcphdr->ack_num = getSockNextAck(id);
+    if (tcphdr->ack_num == 0)
+        tcphdr->ack_num = tcphdr->sequence;
     tcphdr->sequence = ack;
 
     tcphdr->window = 0xf601; // 502 NBO;
+}
+
+void ftpd_sendGreeting(uint8_t *buff, uint32_t p_len, uint8_t id) {
+    ftpd_prepareHeaders(buff, p_len, 12, id);
+    struct tcpip_header* tcphdr = map_tcpip_header(buff);
     memcpy((uint8_t*)(tcphdr)+TCP_HDR_BASE_LEN, "220 bcmFTP\r\n", 12);
     tcphdr->checksum = 0;
     tcphdr->checksum = transportCalcChecksum(buff, ETH_IP_TCP_HDR_BASE_LEN + 12);
-    enc28j60PacketSend(ETH_IP_TCP_HDR_BASE_LEN + 12,buff);
+    sockSendData(buff, ETH_IP_TCP_HDR_BASE_LEN + 12, id);
+    //enc28j60PacketSend(ETH_IP_TCP_HDR_BASE_LEN + 12,buff);
+}
+
+// 530
+void ftpd_sendCredRequired(uint8_t *buff, uint32_t p_len, uint8_t id) {
+    ftpd_prepareHeaders(buff, p_len, 17, id);
+    struct tcpip_header* tcphdr = map_tcpip_header(buff);
+    memcpy((uint8_t*)(tcphdr)+TCP_HDR_BASE_LEN, "530 unathorized\r\n", 17);
+    tcphdr->checksum = 0;
+    tcphdr->checksum = transportCalcChecksum(buff, ETH_IP_TCP_HDR_BASE_LEN + 17);
+    sockSendData(buff, ETH_IP_TCP_HDR_BASE_LEN + 17, id);
+    //enc28j60PacketSend(ETH_IP_TCP_HDR_BASE_LEN + 17,buff);
+}
+
+// 331
+void ftpd_sendPassRequired(uint8_t *buff, uint32_t p_len, uint8_t id) {
+    ftpd_prepareHeaders(buff, p_len, 16, id);
+    struct tcpip_header* tcphdr = map_tcpip_header(buff);
+    memcpy((uint8_t*)(tcphdr)+TCP_HDR_BASE_LEN, "331 need passw\r\n", 16);
+    tcphdr->checksum = 0;
+    tcphdr->checksum = transportCalcChecksum(buff, ETH_IP_TCP_HDR_BASE_LEN + 16);
+    sockSendData(buff, ETH_IP_TCP_HDR_BASE_LEN + 16, id);
+    //enc28j60PacketSend(ETH_IP_TCP_HDR_BASE_LEN + 16,buff);
+}
+
+
+
+uint8_t ftpd_getCMD(uint8_t *buff, uint32_t p_len) {
+    if (p_len < ETH_IP_TCP_HDR_BASE_LEN) {
+        return MAX_CMD; // error
+    }
+#define PKT_CMD (buff+ETH_IP_TCP_HDR_BASE_LEN)
+    uint8_t id = 0;
+    while (ftp_cmd_list[id].id != 255) {
+        if (ftpd_4bcmp( PKT_CMD, ftp_cmd_list[id].name)) {
+            return id;
+        }
+        id++;
+    }
+    return MAX_CMD; // error
 }
 
