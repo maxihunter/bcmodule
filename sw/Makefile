@@ -65,8 +65,7 @@ Middlewares/Third_Party/FatFs/src/ff_gen_drv.c \
 Middlewares/Third_Party/FatFs/src/option/syscall.c \
 Core/Src/sysmem.c \
 Core/Src/syscalls.c \
-enc28j60/src/enc28j60.c \
-enc28j60/src/ip_arp_udp_tcp.c \
+enc28j60/enc28j60.c \
 inet/iplayer.c \
 inet/pkt_headers.c \
 sd/sd_card.c \
@@ -79,6 +78,7 @@ Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_rtc_ex.c \
 Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_adc.c \
 Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_adc_ex.c
 
+#enc28j60/src/ip_arp_udp_tcp.c \
 #enc28j60/src/dhcp.c
 
 # ASM sources
@@ -153,7 +153,7 @@ C_INCLUDES =  \
 -IDrivers/CMSIS/Include \
 -Isd \
 -Iinet \
--Ienc28j60/inc/
+-Ienc28j60
 
 
 # compile gcc flags

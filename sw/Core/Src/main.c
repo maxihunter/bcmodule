@@ -81,7 +81,7 @@ static char * fpass = "1234";
 uint8_t sect[512];
 //extern char str1[60];
 uint32_t byteswritten,bytesread;
-uint8_t result;
+//uint8_t result;
 extern char USERPath[4]; /* logical drive path */
 FATFS SDFatFs;
 FATFS *fs;
@@ -154,7 +154,7 @@ int main(void)
 
   /* USER CODE BEGIN 1 */
 	FRESULT res; //ðåçóëüòàò âûïîëíåíèÿ
-	uint8_t wtext[]="Hello from STM32!!!";
+	//uint8_t wtext[]="Hello from STM32!!!";
 	FILINFO fileInfo;
 	char *fn;
 	DIR dir;
@@ -279,6 +279,8 @@ int main(void)
 		}
 	}
 #endif
+    print_sdcard(NULL);
+    /*
 	f_getfree("/", &fre_clust, &fs);
 	printf("Free clusters: %lu\r\n",fre_clust);
 	printf("FATent: %lu\r\n",fs->n_fatent);
@@ -288,21 +290,13 @@ int main(void)
 	fre_sect = fre_clust * fs->csize;
 	printf("Sectors free: %lu\r\n",fre_sect);
 	printf( "%lu KB total drive space.\r\n%lu KB available.\r\n",
-	fre_sect/2, tot_sect/2);
+	fre_sect/2, tot_sect/2);*/
 	//FATFS_UnLinkDriver(USERPath);
-  /*
-  FATFS fs;
-  FRESULT res;
-  res = f_mount(&fs, USERPath, 1);
-  if (res != FR_OK) {
-      printf("SDCard not found\r\n");
-  } else {
-      printf("SDCard OK\r\n");
-  }*/
   
   enc28j60_set_spi(&hspi2);
   enc28j60Init(mac);
-  printf("Network module OK\r\n");
+  printf("PHY module rev.%c\r\n", 'A' + enc28j60getrev());
+  printf("Network OK\r\n");
   //enc28j60DisableBroadcast();
   //enc28j60DisableMulticast();
   
@@ -326,15 +320,7 @@ int main(void)
   ftpd_set_data_sock(1);
   ftpdSetAddr(&net_addr);
 
-  printf(
-          "\tIP address: %d.%d.%d.%d\r\n"
-          "\tIP netmask: %d.%d.%d.%d\r\n"
-          "\tGW address: %d.%d.%d.%d\r\n"
-          "\tDNS address: %d.%d.%d.%d\r\n",
-          PRINTABLE_IPADDR(net_addr.ipaddr),
-          PRINTABLE_IPADDR(net_addr.mask),
-          PRINTABLE_IPADDR(net_addr.gateway),
-          PRINTABLE_IPADDR(net_addr.dnssrv));
+  print_ipaddr(NULL);
   printf("\r\nSystem ready!\r\n");
   HAL_UART_Transmit(&huart1, "--#> ", 5, HAL_MAX_DELAY);
   HAL_UART_Receive_IT(&huart1, inbuff, 1);

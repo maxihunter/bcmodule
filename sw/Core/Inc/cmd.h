@@ -34,11 +34,12 @@ typedef void (*cmdFunc) (char * arg);
 struct cmd_description {
     char * name;
     uint8_t id;
-    char * desc;
     cmdFunc proc;
 };
 
 void cmd_process(char * cmd, uint8_t len);
+void print_ipaddr(char *cmd);
+void print_sdcard(char *cmd);
 
 #endif // __CMD_H__
 

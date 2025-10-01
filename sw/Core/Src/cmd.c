@@ -26,34 +26,43 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include "enc28j60.h"
+#include "fatfs.h"
+#include "sd_card.h"
+#include "dhcpd.h"
 
 extern struct inet_addr net_addr;
 extern RTC_HandleTypeDef hrtc;
+extern UART_HandleTypeDef huart1;
+extern uint8_t sect[512];
+extern FATFS *fs;
 
 static void print_help(char *cmd);
 static void print_version(char *cmd);
 static void print_date(char *cmd);
+static void print_link(char *cmd);
+static void handle_link(char *cmd);
+static void handle_switch1(char *cmd);
+static void handle_switch2(char *cmd);
+static void handle_switch3(char *cmd);
+//static void print_link(char *cmd);
+static void print_sdfiles(char *cmd);
 
 const struct cmd_description cmd_list[] = {
-    {"ver", 0, "Print Version", &print_version},
-    {"help", 1, "Print help", &print_help},
-    {"usb", 2, "USB on/off", &print_help},
-    {"ftp", 3, "FTP on/off", &print_help},
-    {"link", 4, "Eth Link up/down", &print_help},
-    {"sd_st", 5, "SD status", &print_help},
-    {"con1", 6, "CON1 on/off", &print_help},
-    {"con2", 7, "CON2 on/off", &print_help},
-    {"con3", 8, "CON3 on/off", &print_help},
-    {"date", 9, "Show date", &print_date},
-    {NULL, 255, NULL, NULL},
+    {"con1", 6, &handle_switch1},
+    {"con2", 7, &handle_switch2},
+    {"con3", 8, &handle_switch3},
+    {"date", 9, &print_date},
+    {"help", 1, &print_help},
+    {"ipaddr", 1, &print_ipaddr},
+    {"link", 4, &handle_link},
+    {"ftp", 3, &print_help},
+    {"sdinf", 5, &print_sdcard},
+    {"sdls", 5, &print_sdfiles},
+    {"usb", 2, &print_help},
+    {"ver", 0, &print_version},
+    {NULL, 255, NULL},
 };
-/*{
-    char * name;
-    uint8_t id;
-    char * desc;
-    cmdFunc proc;
-}*/
-
 
 void cmd_process(char * cmd, uint8_t len) {
     char *cmd_ptr = cmd;
@@ -72,7 +81,7 @@ void cmd_process(char * cmd, uint8_t len) {
             if (cmd_ptr == cmd)
                 (cmd_list[i].proc)(NULL);
             else
-                (cmd_list[i].proc)(cmd_ptr);
+                (cmd_list[i].proc)(cmd_ptr+1);
             found = 1;
             break;
         }
@@ -85,7 +94,7 @@ void cmd_process(char * cmd, uint8_t len) {
 void print_help(char *cmd) {
     uint8_t cmd_id = 0;
     while (cmd_list[cmd_id].id != 255) {
-        printf("  %s - %s\r\n", cmd_list[cmd_id].name, cmd_list[cmd_id].desc);
+        printf("\t%s\r\n", cmd_list[cmd_id].name);
         cmd_id++;
     }
 }
@@ -106,3 +115,150 @@ void print_date(char *cmd) {
   printf("System time is %02d-%02d-20%02d %02d:%02d:%02d\r\n", sDate.Date, sDate.Month, sDate.Year,
           sTime.Hours, sTime.Minutes, sTime.Seconds);
 }
+
+void print_ipaddr(char *cmd) {
+  printf(
+          "\tIP address: %d.%d.%d.%d\r\n"
+          "\tIP netmask: %d.%d.%d.%d\r\n"
+          "\tGW address: %d.%d.%d.%d\r\n"
+          "\tDNS address: %d.%d.%d.%d\r\n",
+          PRINTABLE_IPADDR(net_addr.ipaddr),
+          PRINTABLE_IPADDR(net_addr.mask),
+          PRINTABLE_IPADDR(net_addr.gateway),
+          PRINTABLE_IPADDR(net_addr.dnssrv));
+}
+
+void handle_link(char *cmd) {
+    // halt???? 
+    /*if (cmd) {
+        if (*cmd == '0') {
+            enc28j60PowerDown();
+        } else {
+            enc28j60PowerUp();
+        }
+        printf("Switching ");
+    }*/
+    printf("PHY link: \r\n");
+    /*
+    if (enc28j60linkup()) {
+        printf("UP\r\n");
+    } else {
+        printf("DOWN\r\n");
+    }*/
+}
+
+void handle_switch1(char *cmd) {
+    if (cmd) {
+        if (*cmd == '0') {
+            HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_RESET);
+        } else {
+            HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_SET);
+        }
+        printf("Switching ");
+    }
+    printf("SW1: ");
+    if (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_12)) {
+        printf("OPEN\r\n");
+    } else {
+        printf("CLOSE\r\n");
+    }
+}
+
+void handle_switch2(char *cmd) {
+    if (cmd) {
+        if (*cmd == '0') {
+            HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_RESET);
+        } else {
+            HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_SET);
+        }
+        printf("Switching ");
+    }
+    printf("SW1: ");
+    if (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_12)) {
+        printf("OPEN\r\n");
+    } else {
+        printf("CLOSE\r\n");
+    }
+}
+
+void handle_switch3(char *cmd) {
+    if (cmd) {
+        if (*cmd == '0') {
+            HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_RESET);
+        } else {
+            HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_SET);
+        }
+        printf("Switching ");
+    }
+    printf("SW1: ");
+    if (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_12)) {
+        printf("OPEN\r\n");
+    } else {
+        printf("CLOSE\r\n");
+    }
+}
+
+void print_sdcard(char *cmd) {
+    DWORD fre_clust, fre_sect, tot_sect;
+    f_getfree("/", &fre_clust, &fs);
+    printf("Free clusters: %lu\r\n",fre_clust);
+    printf("FATent: %lu\r\n",fs->n_fatent);
+    printf("FS csize: %d\r\n",fs->csize);
+    tot_sect = (fs->n_fatent - 2) * fs->csize;
+    printf("Total sectors: %lu\r\n",tot_sect);
+    fre_sect = fre_clust * fs->csize;
+    printf("Sectors free: %lu\r\n",fre_sect);
+    printf( "%lu KB total drive space.\r\n%lu KB available.\r\n",
+            fre_sect/2, tot_sect/2);
+}
+
+void print_sdfiles(char *cmd) {
+    uint8_t result;
+    FILINFO fileInfo;
+    char *fn;
+    DIR dir;
+    fileInfo.lfname = (char*)sect;
+    fileInfo.lfsize = sizeof(sect);
+    result = f_opendir(&dir, "/");
+    if (result == FR_OK)
+    {
+        while(1)
+        {
+            result = f_readdir(&dir, &fileInfo);
+            if (result==FR_OK && fileInfo.fname[0])
+            {
+                fn = fileInfo.lfname;
+                if(fileInfo.fattrib&AM_DIR)
+                {
+                    HAL_UART_Transmit(&huart1,(uint8_t*)" [DIR] ",7,0x1000);
+                } else {
+                    //char csz[7] = {0};
+                    uint32_t size = 0;
+                    if(strlen(fn)) {
+                        size = fileInfo.lfsize;
+                    } else {
+                        size = fileInfo.fsize;
+                    }
+                    if(size > 1000) {
+                        size /= 1000;
+                    }
+                    printf("%lu", size);
+                    HAL_UART_Transmit(&huart1,(uint8_t*)"  ---  ",7,0x1000);
+                }
+                HAL_UART_Transmit(&huart1, "  ", 2,0x1000);
+                if(strlen(fn)) {
+                    HAL_UART_Transmit(&huart1,(uint8_t*)fn,strlen(fn),0x1000);
+                } else {
+                    HAL_UART_Transmit(&huart1,(uint8_t*)fileInfo.fname,strlen((char*)fileInfo.fname),0x1000);
+                }
+            }
+            else break;
+            HAL_UART_Transmit(&huart1,(uint8_t*)"\r\n",2,0x1000);
+        }
+        f_closedir(&dir);
+    }
+}
+
+
+
+
