@@ -104,6 +104,7 @@ static const char * passwd = NULL;
 void ftpd_sendGreeting(uint8_t *buff, uint32_t p_len, uint8_t id);
 void ftpd_sendCredRequired(uint8_t *buff, uint32_t p_len, uint8_t id);
 void ftpd_sendPassRequired(uint8_t *buff, uint32_t p_len, uint8_t id);
+void ftpd_sendLoginSuccessfull(uint8_t *buff, uint32_t p_len, uint8_t id);
 uint8_t ftpd_getCMD(uint8_t *buff, uint32_t p_len);
 
 static inline uint8_t ftpd_4bcmp(uint8_t *cmd1, uint8_t *cmd2) {
@@ -143,7 +144,6 @@ uint8_t ftpd_routine(uint8_t * buff, uint32_t len) {
         return 0;
     }
     
-    //printf("ESTABBbbblish\r\n");
     if (!ftp_user.seen) {
         ftpd_sendGreeting(buff, len, sockid);
         ftp_user.seen = 1;
@@ -151,10 +151,6 @@ uint8_t ftpd_routine(uint8_t * buff, uint32_t len) {
     }
     if (!ftp_user.authorized) {
         uint8_t cmd = ftpd_getCMD(buff, len);
-        if (cmd != USER_CMD && cmd != PASS_CMD) {
-            ftpd_sendCredRequired(buff, len, sockid);
-            return 1;
-        }
         if (cmd == USER_CMD) {
             ftp_user.username[0] = buff[ETH_IP_TCP_HDR_BASE_LEN + 0xb + 0];
             ftp_user.username[1] = buff[ETH_IP_TCP_HDR_BASE_LEN + 0xb + 1];
@@ -175,7 +171,12 @@ uint8_t ftpd_routine(uint8_t * buff, uint32_t len) {
                 ftpd_sendCredRequired(buff, len, sockid);
                 return 1;
             }
+            ftpd_sendLoginSuccessfull(buff, len, sockid);
+            ftp_user.authorized = 1;
+            return 1;
         }
+        ftpd_sendCredRequired(buff, len, sockid);
+        return 1;
     }
     return 0;
 }
@@ -228,7 +229,7 @@ static void ftpd_prepareHeaders(uint8_t *buff, uint32_t p_len, uint16_t data_len
 void ftpd_sendGreeting(uint8_t *buff, uint32_t p_len, uint8_t id) {
     ftpd_prepareHeaders(buff, p_len, 12, id);
     struct tcpip_header* tcphdr = map_tcpip_header(buff);
-    memcpy((uint8_t*)(tcphdr)+TCP_HDR_BASE_LEN, "220 bcmFTP\r\n", 12);
+    memcpy((uint8_t*)(tcphdr)+TCP_HDR_BASE_LEN, FTP_GREETINGS_OK" bcmFTP\r\n", 12);
     tcphdr->checksum = 0;
     tcphdr->checksum = transportCalcChecksum(buff, ETH_IP_TCP_HDR_BASE_LEN + 12);
     sockSendData(buff, ETH_IP_TCP_HDR_BASE_LEN + 12, id);
@@ -239,22 +240,29 @@ void ftpd_sendGreeting(uint8_t *buff, uint32_t p_len, uint8_t id) {
 void ftpd_sendCredRequired(uint8_t *buff, uint32_t p_len, uint8_t id) {
     ftpd_prepareHeaders(buff, p_len, 17, id);
     struct tcpip_header* tcphdr = map_tcpip_header(buff);
-    memcpy((uint8_t*)(tcphdr)+TCP_HDR_BASE_LEN, "530 unathorized\r\n", 17);
+    memcpy((uint8_t*)(tcphdr)+TCP_HDR_BASE_LEN, FTP_NOT_LOGGED_IN" unathorized\r\n", 17);
     tcphdr->checksum = 0;
     tcphdr->checksum = transportCalcChecksum(buff, ETH_IP_TCP_HDR_BASE_LEN + 17);
     sockSendData(buff, ETH_IP_TCP_HDR_BASE_LEN + 17, id);
-    //enc28j60PacketSend(ETH_IP_TCP_HDR_BASE_LEN + 17,buff);
 }
 
 // 331
 void ftpd_sendPassRequired(uint8_t *buff, uint32_t p_len, uint8_t id) {
     ftpd_prepareHeaders(buff, p_len, 16, id);
     struct tcpip_header* tcphdr = map_tcpip_header(buff);
-    memcpy((uint8_t*)(tcphdr)+TCP_HDR_BASE_LEN, "331 need passw\r\n", 16);
+    memcpy((uint8_t*)(tcphdr)+TCP_HDR_BASE_LEN, FTP_USER_PASS_REQ" need passw\r\n", 16);
     tcphdr->checksum = 0;
     tcphdr->checksum = transportCalcChecksum(buff, ETH_IP_TCP_HDR_BASE_LEN + 16);
     sockSendData(buff, ETH_IP_TCP_HDR_BASE_LEN + 16, id);
-    //enc28j60PacketSend(ETH_IP_TCP_HDR_BASE_LEN + 16,buff);
+}
+
+void ftpd_sendLoginSuccessfull(uint8_t *buff, uint32_t p_len, uint8_t id) {
+    ftpd_prepareHeaders(buff, p_len, 8, id);
+    struct tcpip_header* tcphdr = map_tcpip_header(buff);
+    memcpy((uint8_t*)(tcphdr)+TCP_HDR_BASE_LEN, FTP_USER_LOGIN_OK" OK\r\n", 8);
+    tcphdr->checksum = 0;
+    tcphdr->checksum = transportCalcChecksum(buff, ETH_IP_TCP_HDR_BASE_LEN + 8);
+    sockSendData(buff, ETH_IP_TCP_HDR_BASE_LEN + 8, id);
 }
 
 
