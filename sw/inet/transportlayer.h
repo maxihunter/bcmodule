@@ -43,6 +43,9 @@ struct socket {
     uint32_t seq;
     uint16_t last_data_len;
     uint32_t next_ack;
+    uint8_t client_ip[4];
+    uint8_t client_mac[6];
+    uint16_t client_port;
 };
 
 /* SOCK */
@@ -53,6 +56,8 @@ uint8_t socketRoutine(uint8_t *buff, uint32_t len);
 uint16_t transportCalcChecksum(uint8_t *buff, uint32_t p_len);
 uint16_t getSockLastDataLen(uint8_t id);
 uint32_t getSockNextAck(uint8_t id);
+void sock_softCloseSock(uint8_t *buff, uint32_t p_len, uint8_t sockid);
+void sock_forceCloseSock(uint8_t *buff, uint32_t p_len, uint8_t sockid);
 
 
 #endif
