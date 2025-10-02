@@ -101,10 +101,18 @@ static const char * passwd = NULL;
     uint8_t data_transfer;
 };*/
 
+<<<<<<< Updated upstream
 void ftpd_sendGreeting(uint8_t *buff, uint32_t p_len, uint8_t id);
 void ftpd_sendCredRequired(uint8_t *buff, uint32_t p_len, uint8_t id);
 void ftpd_sendPassRequired(uint8_t *buff, uint32_t p_len, uint8_t id);
 void ftpd_sendLoginSuccessfull(uint8_t *buff, uint32_t p_len, uint8_t id);
+=======
+static void ftpd_sendGreeting(uint8_t *buff, uint32_t p_len, uint8_t id);
+static void ftpd_sendCredRequired(uint8_t *buff, uint32_t p_len, uint8_t id);
+static void ftpd_sendPassRequired(uint8_t *buff, uint32_t p_len, uint8_t id);
+
+static void ftpd_processCommand(uint8_t *buff, uint32_t p_len, uint8_t id);
+>>>>>>> Stashed changes
 uint8_t ftpd_getCMD(uint8_t *buff, uint32_t p_len);
 
 static inline uint8_t ftpd_4bcmp(uint8_t *cmd1, uint8_t *cmd2) {
@@ -178,6 +186,7 @@ uint8_t ftpd_routine(uint8_t * buff, uint32_t len) {
         ftpd_sendCredRequired(buff, len, sockid);
         return 1;
     }
+	ftpd_processCommand(buff, len, sockid);
     return 0;
 }
 
@@ -265,7 +274,53 @@ void ftpd_sendLoginSuccessfull(uint8_t *buff, uint32_t p_len, uint8_t id) {
     sockSendData(buff, ETH_IP_TCP_HDR_BASE_LEN + 8, id);
 }
 
-
+void ftpd_processCommand(uint8_t *buff, uint32_t p_len, uint8_t id) {
+	uint8_t cmd = ftpd_getCMD(buff, len);
+	    /*{"USER", USER_CMD},
+    //{"ACCR", ACCT_CMD},
+    {"PASS", PASS_CMD},
+    {"TYPE", TYPE_CMD},
+    {"LIST", LIST_CMD},
+    {"CWD", CWD_CMD},
+    {"DELE", DELE_CMD},
+    {"NAME", NAME_CMD},
+    {"QUIT", QUIT_CMD},
+    {"RETR", RETR_CMD},
+    {"STOR", STOR_CMD},
+    {"PORT", PORT_CMD},
+    {"NLST", NLST_CMD},
+    {"PWD", PWD_CMD},
+    {"XPWD", XPWD_CMD},
+    {"MKD", MKD_CMD},
+    {"XMKD", XMKD_CMD},
+    {"XRMD", XRMD_CMD},
+    {"RMD", RMD_CMD},
+    {"STRU", STRU_CMD},
+    {"MODE", MODE_CMD},
+    {"SYST", SYST_CMD},
+    {"XMDS", XMD5_CMD},
+    {"XCWD", XCWD_CMD},
+    {"FEAT", FEAT_CMD},
+    {"PASV", PASV_CMD},
+    {"SIZE", SIZE_CMD},
+    {"MLSD", MLSD_CMD},
+    {"APPE", APPE_CMD},
+    {"NO", NO_CMD},
+    { NULL , MAX_CMD},*/
+	switch(cmd) {
+		case SYST_CMD:
+			break;
+		case FEAT_CMD:
+			break;
+		case PASV_CMD:
+			break;
+		case MKD_CMD:
+			break;
+		case DELE_CMD:
+			break;
+		
+	}
+}
 
 uint8_t ftpd_getCMD(uint8_t *buff, uint32_t p_len) {
     if (p_len < ETH_IP_TCP_HDR_BASE_LEN) {
