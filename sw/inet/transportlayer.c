@@ -40,9 +40,9 @@ static uint8_t *pbuf;
 static uint32_t pbuf_len = 0;
 static struct socket socks[] = {
     {0, 0, 0, 0 }, // Service socket. Do not use
-    { 0x1400 /*20 network order*/, IP_PROTO_TYPE_TCP, SOCK_LISTEN, 0, 0, {0}, {0}, 0 },
-    { 0x1500 /*21 network order*/, IP_PROTO_TYPE_TCP, SOCK_LISTEN, 0, 0, {0}, {0}, 0 },
-    {65535, 0, 0, 0, 0, {0}, {0}, 0  } // EMPTY
+    { 0x1400 /*20 network order*/, IP_PROTO_TYPE_TCP, SOCK_LISTEN, 0, 0, 0, {0}, {0}, 0 },
+    { 0x1500 /*21 network order*/, IP_PROTO_TYPE_TCP, SOCK_LISTEN, 0, 0, 0, {0}, {0}, 0 },
+    {65535, 0, 0, 0, 0, 0, {0}, {0}, 0  } // EMPTY
 };
 
 void prepareTransportLayer(struct inet_addr * inaddr, uint8_t *buff, uint32_t pbuff_len) {
@@ -160,12 +160,16 @@ uint8_t socketRoutine(uint8_t *buff, uint32_t len) {
 
             memcpy((uint8_t*)&(iphdr->dst_ip), (uint8_t*)&(iphdr->src_ip), 4);
             memcpy((uint8_t*)&(iphdr->src_ip), (uint8_t*)&(int_addr->ipaddr), 4);
+            iphdr->checksum = 0;
+            iphdr->checksum = ipCalcChecksum(buff);
             tcphdr->dport = tcphdr->sport;
             tcphdr->sport = socks[i].port;
             tcphdr->flags |= TCP_FLAG_ACK | TCP_FLAG_FIN;
 
             tcphdr->window = 1460; // make window size double of standard MTU 2 x 1460
-            tcphdr->sequence = socks[i].seq; //TCP_HDR_BASE_LEN
+            uint32_t ack = tcphdr->ack_num;
+            tcphdr->ack_num = tcphdr->sequence + 0x01000000; // +1 in network order
+            tcphdr->sequence = ack;
             tcphdr->checksum = 0;
             tcphdr->checksum = transportCalcChecksum(buff, len);
             enc28j60PacketSend(len,buff);
@@ -230,12 +234,12 @@ uint16_t transportCalcChecksum(uint8_t *buff, uint32_t p_len) {
 }
 
 static uint32_t sock_sendAck(uint8_t *buff, uint32_t p_len, uint16_t ldata) {
-	struct tcpip_header* tcphdr = map_tcpip_header(abuff);
 #ifndef SACK_PERMIT_ENABLE
     uint8_t abuff[ETH_IP_TCP_HDR_BASE_LEN] = {0};
     memcpy(abuff, buff, ETH_IP_TCP_HDR_BASE_LEN);
     struct eth_header* eth = map_eth_header(abuff);
     struct ip_header* iphdr = map_ip_header(abuff);
+	struct tcpip_header* tcphdr = map_tcpip_header(abuff);
 
     memcpy((uint8_t*)&(eth->dst_mac), eth->src_mac, 6);
     memcpy((uint8_t*)&(eth->src_mac), int_addr->macaddr, 6);
@@ -298,28 +302,28 @@ static uint32_t sock_sendAck(uint8_t *buff, uint32_t p_len, uint16_t ldata) {
 }
 
 static void sock_makeTcpHeader(uint8_t *buff, uint32_t p_len, uint8_t sockid, uint16_t data_len, uint8_t flags) {
-    struct eth_header* eth = map_eth_header(abuff);
-    struct ip_header* iphdr = map_ip_header(abuff);
-	struct tcpip_header* tcphdr = map_tcpip_header(abuff);
+    struct eth_header* eth = map_eth_header(buff);
+    struct ip_header* iphdr = map_ip_header(buff);
+	struct tcpip_header* tcphdr = map_tcpip_header(buff);
 
-    memcpy((uint8_t*)&(eth->dst_mac), &socks[i].client_mac, 6);
+    memcpy((uint8_t*)&(eth->dst_mac), &socks[sockid].client_mac, 6);
     memcpy((uint8_t*)&(eth->src_mac), int_addr->macaddr, 6);
 
-    memcpy((uint8_t*)&(iphdr->dst_ip), &socks[i].client_ip, 4);
+    memcpy((uint8_t*)&(iphdr->dst_ip), &socks[sockid].client_ip, 4);
     memcpy((uint8_t*)&(iphdr->src_ip), (uint8_t*)&(int_addr->ipaddr), 4);
 
     iphdr->total_len = 0x2800; // 40 in network order INT16_ITON
 
     iphdr->checksum = 0;
-    iphdr->checksum = ipCalcChecksum(abuff);
-    tcphdr->dport = socks[i].client_port;
-    tcphdr->sport = socks[i].port;
+    iphdr->checksum = ipCalcChecksum(buff);
+    tcphdr->dport = socks[sockid].client_port;
+    tcphdr->sport = socks[sockid].port;
     tcphdr->flags = 0x0050;
     tcphdr->flags |= flags;
 
     uint32_t ack = tcphdr->ack_num;
     uint8_t *ack_ptr = (uint8_t*)&(tcphdr->sequence);
-    uint8_t *ld_ptr = (uint8_t*)&(ldata);
+    uint8_t *ld_ptr = (uint8_t*)&(data_len);
     uint8_t overfl = 0;
 
     /*if (*(ack_ptr+3) + *(ld_ptr) > 255) {
@@ -336,9 +340,9 @@ static void sock_makeTcpHeader(uint8_t *buff, uint32_t p_len, uint8_t sockid, ui
 
     tcphdr->window = 0xf601; // 502 NBO;
     tcphdr->checksum = 0;
-    tcphdr->checksum = transportCalcChecksum(abuff, ETH_IP_TCP_HDR_BASE_LEN); // ACK packet have no data
-    enc28j60PacketSend(ETH_IP_TCP_HDR_BASE_LEN,abuff);
-    return tcphdr->ack_num;
+    tcphdr->checksum = transportCalcChecksum(buff, ETH_IP_TCP_HDR_BASE_LEN); // ACK packet have no data
+    enc28j60PacketSend(ETH_IP_TCP_HDR_BASE_LEN,buff);
+    //return tcphdr->ack_num;
 }
 
 void sock_softCloseSock(uint8_t *buff, uint32_t p_len, uint8_t sockid) {
