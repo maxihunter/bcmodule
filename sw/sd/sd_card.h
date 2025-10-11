@@ -1,5 +1,5 @@
-#ifndef SD_H_
-#define SD_H_
+#ifndef SD_CARD_H_
+#define SD_CARD_H_
 //--------------------------------------------------
 #include "stm32f1xx_hal.h"
 #include <string.h>
@@ -34,4 +34,4 @@ uint8_t SD_Read_Block (uint8_t *buff, uint32_t lba);
 uint8_t SD_Write_Block (uint8_t *buff, uint32_t lba);
 uint8_t SPI_wait_ready(void);
 //--------------------------------------------------
-#endif /* SD_H_ */
+#endif /* SD_CARD_H_ */

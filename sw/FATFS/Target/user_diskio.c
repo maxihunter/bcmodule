@@ -122,9 +122,6 @@ DRESULT USER_read (
 )
 {
   /* USER CODE BEGIN READ */
-//		HAL_UART_Transmit(&huart1,(uint8_t*)"USER_read\r\n",11,0x1000);
-//		sprintf(str1,"sector: %lu; count: %d\r\n",sector, count);
-//		HAL_UART_Transmit(&huart1,(uint8_t*)str1,strlen(str1),0x1000);
 		if (pdrv || !count) return RES_PARERR;
 		if (Stat & STA_NOINIT) return RES_NOTRDY;
 		if (!(sdinfo.type & 4)) sector *= 512; /* Convert to byte address if needed */
@@ -138,7 +135,6 @@ DRESULT USER_read (
 		}
 		SPI_Release();
 		return count ? RES_ERROR : RES_OK;
-    return RES_OK;
   /* USER CODE END READ */
 }
 
@@ -160,9 +156,6 @@ DRESULT USER_write (
 {
   /* USER CODE BEGIN WRITE */
   /* USER CODE HERE */
-//		HAL_UART_Transmit(&huart1,(uint8_t*)"USER_write\r\n",12,0x1000);
-//		sprintf(str1,"sector: %lu\r\n",sector);
-//		HAL_UART_Transmit(&huart1,(uint8_t*)str1,strlen(str1),0x1000);
 	  if (pdrv || !count) return RES_PARERR;
 		if (Stat & STA_NOINIT) return RES_NOTRDY;
 		if (Stat & STA_PROTECT) return RES_WRPRT;
