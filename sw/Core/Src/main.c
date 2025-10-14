@@ -27,6 +27,7 @@
 #include "iplayer.h"
 #include "transportlayer.h"
 #include "dhcpd.h"
+#include "ftpd.h"
 #include "net.h"
 #include <stdio.h>
 #include <string.h>
@@ -111,8 +112,8 @@ int _write(int file, char *ptr, int len)
     HAL_StatusTypeDef hstatus;
 
     if (file == 1 || file == 2) {
-        uint16_t st = 0;
-        /*do {
+        /*uint16_t st = 0;
+        do {
             st = HAL_UART_GetState(&huart1);
         } while (!(st & ( HAL_UART_STATE_READY)));*/
         hstatus = HAL_UART_Transmit(&huart1, (uint8_t*) ptr, len, HAL_MAX_DELAY);
@@ -126,22 +127,22 @@ int _write(int file, char *ptr, int len)
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
     if (huart->Instance == USART1) {
-        HAL_UART_Transmit(huart, inbuff, 1, 100);
+        HAL_UART_Transmit(huart, (uint8_t*)inbuff, 1, 100);
         if (inbuff[0] == 0x0d) { // enter
-            HAL_UART_Transmit(huart, "\n", 1, 100);
+            HAL_UART_Transmit(huart, (uint8_t*)"\n", 1, 100);
             if (cmd_ptr != 0) {
                 cmd_process(cmd, cmd_ptr);
                 memset(cmd, 0, CMD_MAX_LEN);
                 cmd_ptr = 0;
             }
-            HAL_UART_Transmit_IT(huart, "--#> ", 6);
+            HAL_UART_Transmit_IT(huart, (uint8_t*)"--#> ", 6);
         } else {
             cmd[cmd_ptr] = inbuff[0];
 			if (cmd_ptr < CMD_MAX_LEN-1)
 				cmd_ptr++;
         }
 
-        HAL_UART_Receive_IT(huart, inbuff, 1);
+        HAL_UART_Receive_IT(huart, (uint8_t*)inbuff, 1);
     }
 }
 /* USER CODE END 0 */
@@ -154,12 +155,11 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-	FRESULT res; //ðåçóëüòàò âûïîëíåíèÿ
-	//uint8_t wtext[]="Hello from STM32!!!";
-	FILINFO fileInfo;
-	char *fn;
-	DIR dir;
-	DWORD fre_clust, fre_sect, tot_sect;
+	//FRESULT res; //ðåçóëüòàò âûïîëíåíèÿ
+	//FILINFO fileInfo;
+	//char *fn;
+	//DIR dir;
+	//DWORD fre_clust, fre_sect, tot_sect;
 
   /* USER CODE END 1 */
 
@@ -206,81 +206,10 @@ int main(void)
 
     printf("SDCard Info:\r\n");
 	disk_initialize(SDFatFs.drv);
-	//read
-	/*
 	if(f_mount(&SDFatFs,(TCHAR const*)USERPath,0)!=FR_OK)
 	{
 		Error_Handler();
 	}
-	else
-	{
-		if(f_open(&MyFile,"123.txt",FA_READ)!=FR_OK)
-		{
-			Error_Handler();
-		}
-		else
-		{
-			ReadLongFile();
-			f_close(&MyFile);
-		}
-	}
-	*/
-	//write
-	/*
-	if(f_mount(&SDFatFs,(TCHAR const*)USERPath,0)!=FR_OK)
-	{
-		Error_Handler();
-	}
-	else
-	{
-		if(f_open(&MyFile,"mywrite.txt",FA_CREATE_ALWAYS|FA_WRITE)!=FR_OK)
-		{
-			Error_Handler();
-		}
-		else
-		{
-			res=f_write(&MyFile,wtext,sizeof(wtext),(void*)&byteswritten);
-			if((byteswritten==0)||(res!=FR_OK))
-			{
-				Error_Handler();
-			}
-			f_close(&MyFile);
-		}
-	}
-	*/
-	//read dir
-	if(f_mount(&SDFatFs,(TCHAR const*)USERPath,0)!=FR_OK)
-	{
-		Error_Handler();
-	}
-#if 0
-	else
-	{
-		fileInfo.lfname = (char*)sect;
-		fileInfo.lfsize = sizeof(sect);
-		result = f_opendir(&dir, "/");
-		if (result == FR_OK)
-		{
-			while(1)
-			{
-				result = f_readdir(&dir, &fileInfo);
-				if (result==FR_OK && fileInfo.fname[0])
-				{
-					fn = fileInfo.lfname;
-					if(strlen(fn)) HAL_UART_Transmit(&huart1,(uint8_t*)fn,strlen(fn),0x1000);
-					else HAL_UART_Transmit(&huart1,(uint8_t*)fileInfo.fname,strlen((char*)fileInfo.fname),0x1000);
-					if(fileInfo.fattrib&AM_DIR)
-					{
-						HAL_UART_Transmit(&huart1,(uint8_t*)"  [DIR]",7,0x1000);
-					}
-				}
-				else break;
-				HAL_UART_Transmit(&huart1,(uint8_t*)"\r\n",2,0x1000);
-			}
-			f_closedir(&dir);
-		}
-	}
-#endif
     print_sdcard(NULL);
 	//FATFS_UnLinkDriver(USERPath);
   
@@ -291,17 +220,12 @@ int main(void)
   //enc28j60DisableBroadcast();
   //enc28j60DisableMulticast();
   
-  /*uint8_t bbuff[] = "HERE IS ONE PACKEttttttttttttttttttttttttttttttttttttttttttTTTTTTTTTTT";
-
-  memcpy(bbuff + ETH_SRC_MAC, mac, 6);
-  memset(bbuff + ETH_DST_MAC, 0xFF, 6);
-  enc28j60PacketSend(40, bbuff);*/
-
   lastDhcpRequest = HAL_GetTick();
   memcpy(net_addr.macaddr, mac, 6);
   printf("Getting IP from DHCP... (%x:%x:%x:%x:%x:%x)\r\n", 
           net_addr.macaddr[0], net_addr.macaddr[1], net_addr.macaddr[2], net_addr.macaddr[3],
           net_addr.macaddr[4], net_addr.macaddr[5]);
+  cmd_init(pbuf, PBUFF_LEN);
   initDhcp(&net_addr, pbuf, PBUFF_LEN);
   prepareIpLayer(&net_addr, pbuf, PBUFF_LEN);
   prepareTransportLayer(&net_addr, pbuf, PBUFF_LEN);
@@ -313,8 +237,8 @@ int main(void)
 
   print_ipaddr(NULL);
   printf("\r\nSystem ready!\r\n");
-  HAL_UART_Transmit(&huart1, "--#> ", 5, HAL_MAX_DELAY);
-  HAL_UART_Receive_IT(&huart1, inbuff, 1);
+  HAL_UART_Transmit(&huart1, (uint8_t*)"--#> ", 5, HAL_MAX_DELAY);
+  HAL_UART_Receive_IT(&huart1, (uint8_t*)inbuff, 1);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -331,9 +255,6 @@ int main(void)
 
     if(icmpCheckAndReply(pbuf, plen))
         continue;
-
-   /* if (socketRoutine(pbuf, plen))
-        continue;*/
 
     ftpd_routine(pbuf, plen);
     dhcpRenew();

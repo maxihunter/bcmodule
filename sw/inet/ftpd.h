@@ -85,12 +85,13 @@ enum ftp_cmd {
 struct ftp_data {
     char username[4];
     unsigned long last_seen;
-    char * curr_dir;
+    char curr_dir[512];
     uint8_t seen;
     uint8_t authorized;
     uint8_t curr_cmd;
     uint8_t curr_state;
     uint8_t data_transfer;
+    uint32_t data_transfer_ptr;
 };
 
 void ftpd_set_user_password(const char * pass);

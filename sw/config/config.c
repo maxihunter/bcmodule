@@ -21,26 +21,47 @@
  * THE SOFTWARE.
  */
 
-#ifndef __CMD_H__
-#define __CMD_H__
+#include "config.h"
 
-#include <stdint.h>
-#include "stm32f1xx_hal.h"
+struct main_config config_t;
 
-#define SW_VER 1
+void config_show(char *cmd) {
+	printf("dhcp=%d\r\n", config_t.dhcp_f );
+	printf(
+          "ipaddr=%d.%d.%d.%d\r\n"
+          "mask=%d.%d.%d.%d\r\n"
+          "gwaddr=%d.%d.%d.%d\r\n",
+          PRINTABLE_IPADDR(config_t.ipaddr),
+          PRINTABLE_IPADDR(config_t.mask),
+          PRINTABLE_IPADDR(config_t.gwaddr));
+    printf("fpass=%s\r\n", config_t.ftp_pass );
+}
 
-typedef void (*cmdFunc) (char * arg);
+void config_save(char *cmd) {
+	// TODO save
+	printf("OK\r\n");
+}
 
-struct cmd_description {
-    char * name;
-    uint8_t id;
-    cmdFunc proc;
-};
+void config_set_dhcp(char *cmd) 
+{
+	config_t.dhcp_f = '0' - *cmd;
+}
+void config_set_ipaddr(char *cmd) 
+{
+	memcpy(config_t.ipaddr, (uint8_t *)cmd, 4);
+}
 
-void cmd_init(uint8_t *buff, uint32_t pbuff_len);
-void cmd_process(char * cmd, uint8_t len);
-void print_ipaddr(char *cmd);
-void print_sdcard(char *cmd);
+void config_set_mask(char *cmd)
+{
+	memcpy(config_t.mask, (uint8_t *)cmd, 4);
+}
 
-#endif // __CMD_H__
+void config_set_gwaddr(char *cmd)
+{
+	memcpy(config_t.gwaddr, (uint8_t *)cmd, 4);
+}
 
+void config_set_ftp_pass(char *cmd)
+{
+	strncpy(config_t.ftp_pass, (uint8_t *)cmd, 4);
+}

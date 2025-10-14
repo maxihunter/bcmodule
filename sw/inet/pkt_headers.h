@@ -184,8 +184,11 @@
 #define TCP_FLAG_ECN (1 << 0)
 
 #define TCP_HDR_BASE_LEN sizeof(struct tcpip_header)
+#define ICMP_HDR_BASE_LEN sizeof(struct icmp_header)
 #define IP_HDR_BASE_LEN sizeof(struct ip_header)
 #define ETH_HDR_BASE_LEN sizeof(struct eth_header)
+#define ARP_HDR_BASE_LEN sizeof(struct arp_header)
+#define ETH_IP_ICMP_HDR_BASE_LEN (ICMP_HDR_BASE_LEN+IP_HDR_BASE_LEN+ETH_HDR_BASE_LEN)
 #define ETH_IP_TCP_HDR_BASE_LEN (TCP_HDR_BASE_LEN+IP_HDR_BASE_LEN+ETH_HDR_BASE_LEN)
 
 struct eth_header {
@@ -199,6 +202,18 @@ struct eth_header {
 #define IP_HDR_GET_IHL(x) ( x & 0x0f )
 
 #define INT16_ITON(x) ( ( (x) << 8 ) | ( (x) >> 8 ) )
+
+struct arp_header {
+	uint16_t hw_type;
+	uint16_t pr_type;
+	uint8_t hw_size;
+	uint8_t pr_size;
+	uint16_t opcode;
+	uint8_t smac[6];
+	uint32_t sip;
+	uint8_t dmac[6];
+	uint32_t dip;
+}__attribute__((packed));
 
 struct ip_header {
 	uint8_t version_ihl;
@@ -220,6 +235,14 @@ struct ip_opts {
 	uint16_t id;
 	uint16_t frag_offset;
 } __attribute__((packed));
+
+struct icmp_header {
+	uint8_t type;
+	uint8_t code;
+	uint16_t checksum;
+	uint16_t id;
+	uint16_t seq;
+}__attribute__((packed));
 
 struct tcpip_header {
 	uint16_t sport;
@@ -244,8 +267,16 @@ inline struct eth_header* map_eth_header(uint8_t* buff) {
     return (struct eth_header*)buff;
 }
 
+inline struct arp_header* map_arp_header(uint8_t* buff) {
+    return (struct arp_header*)(buff+sizeof(struct eth_header));
+}
+
 inline struct ip_header* map_ip_header(uint8_t* buff) {
     return (struct ip_header*)(buff+sizeof(struct eth_header));
+}
+
+inline struct icmp_header* map_icmp_header(uint8_t* buff) {
+    return (struct icmp_header*)(buff+sizeof(struct eth_header)+sizeof(struct ip_header));
 }
 
 inline struct tcpip_header* map_tcpip_header(uint8_t* buff) {

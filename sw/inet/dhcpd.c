@@ -28,6 +28,7 @@
 #include "enc28j60.h"
 //#include "ip_arp_udp_tcp.h"
 #include "pkt_headers.h"
+#include "transportlayer.h"
 #include "net.h"
 
 static void dhcp_send_packet(uint8_t* buf, uint32_t len, uint8_t requestType);

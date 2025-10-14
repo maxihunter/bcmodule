@@ -30,6 +30,7 @@
 #include "fatfs.h"
 #include "sd_card.h"
 #include "dhcpd.h"
+#include "config.h"
 
 extern struct inet_addr net_addr;
 extern RTC_HandleTypeDef hrtc;
@@ -37,32 +38,52 @@ extern UART_HandleTypeDef huart1;
 extern uint8_t sect[512];
 extern FATFS *fs;
 
+static uint8_t *pbuf;
+static uint32_t pbuf_len = 0;
+
 static void print_help(char *cmd);
 static void print_version(char *cmd);
+static void print_bell(char *cmd);
 static void print_date(char *cmd);
 static void print_link(char *cmd);
 static void handle_link(char *cmd);
+static void handle_ping(char *cmd);
+static void handle_arp(char *cmd);
 static void handle_switch1(char *cmd);
 static void handle_switch2(char *cmd);
 static void handle_switch3(char *cmd);
-//static void print_link(char *cmd);
 static void print_sdfiles(char *cmd);
 
 const struct cmd_description cmd_list[] = {
+    {"arp", 0, &handle_arp},
     {"con1", 6, &handle_switch1},
     {"con2", 7, &handle_switch2},
     {"con3", 8, &handle_switch3},
+	{"conf", 5, &config_show},
+	{"bell", 9, &print_bell},
     {"date", 9, &print_date},
     {"help", 1, &print_help},
     {"ipaddr", 1, &print_ipaddr},
     {"link", 4, &handle_link},
     {"ftp", 3, &print_help},
+    {"ping", 0, &handle_ping},
+	{"save", 5, &config_save},
     {"sdinf", 5, &print_sdcard},
     {"sdls", 5, &print_sdfiles},
+	{"setdhcp", 5, &config_set_dhcp},
+	{"setpass", 5, &config_set_ftp_pass},
+	{"setgw", 5, &config_set_gwaddr},
+	{"setip", 5, &config_set_ipaddr},
+	{"setmask", 5, &config_set_mask},	
     {"usb", 2, &print_help},
     {"ver", 0, &print_version},
     {NULL, 255, NULL},
 };
+
+void cmd_init(uint8_t *buff, uint32_t pbuff_len) {
+    pbuf = buff;
+    pbuf_len = pbuff_len;
+}
 
 void cmd_process(char * cmd, uint8_t len) {
     char *cmd_ptr = cmd;
@@ -75,9 +96,7 @@ void cmd_process(char * cmd, uint8_t len) {
     }
     uint8_t found = 0;
     for (int i = 0; cmd_list[i].id != 255; i++) {
-        //printf("coll id=%d %s(%d)\r\n",i, cmd, len);
         if (strcmp(cmd_list[i].name, cmd) == 0) {
-            //printf("coll id=%d\r\n",i);
             if (cmd_ptr == cmd)
                 (cmd_list[i].proc)(NULL);
             else
@@ -101,6 +120,10 @@ void print_help(char *cmd) {
 
 void print_version(char *cmd) {
     printf("sw version: %d\r\n", SW_VER);
+}
+
+void print_bell(char *cmd) {
+    printf("\a\r\n");
 }
 
 void print_date(char *cmd) {
@@ -140,6 +163,30 @@ void handle_link(char *cmd) {
     }*/
     printf("PHY link: \r\n");
     /*
+    if (enc28j60linkup()) {
+        printf("UP\r\n");
+    } else {
+        printf("DOWN\r\n");
+    }*/
+}
+
+void handle_ping(char *cmd) {
+    printf("Ping: %s\r\n", cmd);
+
+    uint32_t ip = _inet_pton(cmd);
+    uint8_t mac[6] = {0};
+    if (getHostMacByArp(pbuf, pbuf_len, ip, &mac)) {
+        printf("Get MAC failed\r\n");
+        return;
+    }
+    icmpPingHost(ip, &mac);
+}
+
+void handle_arp(char *cmd) {
+    printf("ARP resolve: %s\r\n", cmd);
+
+    /*
+    uint8_t getHostMacByArp(uint8_t *buff, uint32_t len, uint32_t hostaddr, uint8_t *hostmac);
     if (enc28j60linkup()) {
         printf("UP\r\n");
     } else {

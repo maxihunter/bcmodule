@@ -21,26 +21,35 @@
  * THE SOFTWARE.
  */
 
-#ifndef __CMD_H__
-#define __CMD_H__
 
-#include <stdint.h>
-#include "stm32f1xx_hal.h"
+#ifndef __CONFIG_H__
+#define __CONFIG_H__
 
-#define SW_VER 1
+#include <inttypes.h>
+#include <string.h>
 
-typedef void (*cmdFunc) (char * arg);
+#define CONFIG_RESERVED_SIZE 32
 
-struct cmd_description {
-    char * name;
-    uint8_t id;
-    cmdFunc proc;
-};
+#define DHCP_FLAG_ENABLE (1 << 0)
 
-void cmd_init(uint8_t *buff, uint32_t pbuff_len);
-void cmd_process(char * cmd, uint8_t len);
-void print_ipaddr(char *cmd);
-void print_sdcard(char *cmd);
+extern uint8_t macAddr[6];
 
-#endif // __CMD_H__
+struct main_config {
+	uint8_t dhcp_f;
+	uint8_t ipaddr[4];
+	uint8_t ipmask[4];
+	uint8_t gwaddr[4];
+	char ftp_pass[8];
+} __attribute__((packed));
+
+void config_show(char *cmd);
+void config_save(char *cmd);
+
+void config_set_dhcp(char *cmd);
+void config_set_ipaddr(char *cmd);
+void config_set_mask(char *cmd);
+void config_set_gwaddr(char *cmd);
+void config_set_ftp_pass(char *cmd);
+
+#endif // __CONFIG_H__
 

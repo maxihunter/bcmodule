@@ -24,6 +24,8 @@ DEBUG = 1
 # optimization
 OPT = -Og
 
+ROM_S = 65535
+RAM_S = 20480
 
 #######################################
 # paths
@@ -68,6 +70,7 @@ Core/Src/syscalls.c \
 enc28j60/enc28j60.c \
 inet/iplayer.c \
 inet/pkt_headers.c \
+config/config.c \
 sd/sd_card.c \
 inet/dhcpd.c \
 inet/ftpd.c \
@@ -165,6 +168,7 @@ C_INCLUDES =  \
 -IDrivers/CMSIS/Include \
 -Isd \
 -Iinet \
+-Iconfig \
 -Ienc28j60 \
 -IUSB_DEVICE/App \
 -IUSB_DEVICE/Target \
@@ -232,6 +236,8 @@ $(BUILD_DIR)/%.hex: $(BUILD_DIR)/%.elf | $(BUILD_DIR)
 	
 $(BUILD_DIR)/%.bin: $(BUILD_DIR)/%.elf | $(BUILD_DIR)
 	$(BIN) $< $@	
+	$(shell $(SZ) $(BUILD_DIR)/bcm.elf > memory)
+	@python print_mem.py $(ROM_S) $(RAM_S)
 	
 $(BUILD_DIR):
 	mkdir $@		
