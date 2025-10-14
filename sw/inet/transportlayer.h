@@ -50,7 +50,7 @@ struct socket {
 
 /* SOCK */
 uint8_t getSockState(uint8_t id);
-uint8_t getSockPort(uint8_t id);
+uint16_t getSockPort(uint8_t id);
 void sockSendData(uint8_t *buff, uint32_t len, uint8_t id);
 void prepareTransportLayer(struct inet_addr * inaddr, uint8_t *buff, uint32_t pbuff_len);
 uint8_t socketRoutine(uint8_t *buff, uint32_t len);

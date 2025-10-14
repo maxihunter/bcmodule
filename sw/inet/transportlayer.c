@@ -40,7 +40,7 @@ static uint8_t *pbuf;
 static uint32_t pbuf_len = 0;
 static struct socket socks[] = {
     {0, 0, 0, 0, 0, 0, {0}, {0}, 0  }, // Service socket. Do not use
-    { 0x1400 /*20 network order*/, IP_PROTO_TYPE_TCP, SOCK_LISTEN, 0, 0, 0, {0}, {0}, 0 },
+    { 0xff10 /*4351 network order*/, IP_PROTO_TYPE_TCP, SOCK_LISTEN, 0, 0, 0, {0}, {0}, 0 },
     { 0x1500 /*21 network order*/, IP_PROTO_TYPE_TCP, SOCK_LISTEN, 0, 0, 0, {0}, {0}, 0 },
     {65535, 0, 0, 0, 0, 0, {0}, {0}, 0  } // EMPTY
 };
@@ -59,8 +59,8 @@ uint8_t getSockSeq(uint8_t id) {
     return socks[id].seq;
 }
 
-uint8_t getSockPort(uint8_t id) {
-    return (socks[id].port >> 8);
+uint16_t getSockPort(uint8_t id) {
+    return socks[id].port;
 }
 
 uint16_t getSockLastDataLen(uint8_t id) {
@@ -199,7 +199,9 @@ uint8_t socketRoutine(uint8_t *buff, uint32_t len) {
             return 0;
         }
         if ( socks[i].state == SOCK_ESTABLISHED && (tcphdr->flags & TCP_FLAG_ACK) && (tcphdr->flags & TCP_FLAG_PSH)) {
-            socks[i].last_data_len = (len - (sizeof(struct eth_header)+sizeof(struct ip_header)+sizeof(struct tcpip_header)));
+            uint16_t dlen = INT16_ITON(iphdr->total_len);
+            socks[i].last_data_len = (dlen - (IP_HDR_BASE_LEN+TCP_HDR_BASE_LEN));
+            //printf("ACKs %x:%x:%x\r\n", iphdr->total_len, dlen, socks[i].last_data_len);
             socks[i].next_ack = sock_sendAck(buff, len, socks[i].last_data_len);
             return i;
         }
