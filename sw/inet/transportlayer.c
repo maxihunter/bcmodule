@@ -39,7 +39,7 @@ static struct inet_addr *int_addr = NULL;
 static uint8_t *pbuf;
 static uint32_t pbuf_len = 0;
 static struct socket socks[] = {
-    {0, 0, 0, 0 }, // Service socket. Do not use
+    {0, 0, 0, 0, 0, 0, {0}, {0}, 0  }, // Service socket. Do not use
     { 0x1400 /*20 network order*/, IP_PROTO_TYPE_TCP, SOCK_LISTEN, 0, 0, 0, {0}, {0}, 0 },
     { 0x1500 /*21 network order*/, IP_PROTO_TYPE_TCP, SOCK_LISTEN, 0, 0, 0, {0}, {0}, 0 },
     {65535, 0, 0, 0, 0, 0, {0}, {0}, 0  } // EMPTY
@@ -57,6 +57,10 @@ uint8_t getSockState(uint8_t id) {
 
 uint8_t getSockSeq(uint8_t id) {
     return socks[id].seq;
+}
+
+uint8_t getSockPort(uint8_t id) {
+    return (socks[id].port >> 8);
 }
 
 uint16_t getSockLastDataLen(uint8_t id) {
@@ -219,15 +223,16 @@ uint16_t transportCalcChecksum(uint8_t *buff, uint32_t p_len) {
         chcksum += 0xFFFF & (((uint32_t)*(buff+buff_pos)<<8)|*(buff+1+buff_pos));
         buff_pos += 2;
     }
-    if(buff_pos == chck_len - 1) {
+    //printf("ex_pos=%x;buf=%x;cch1=%x\r\n", buff_pos, *(buff+buff_pos), chcksum );
+    if(buff_pos == p_len - 1) {
         //printf("ex_pos=%x;buf=%x;cch1=%x\r\n", buff_pos, *(buff+buff_pos), chcksum );
-        chcksum += 0xff00 & (*(buff + buff_pos+1) << 8);
+        chcksum += 0xff00 & (*(buff + buff_pos) << 8);
     }
     while (chcksum >> 16) {
         chcksum = (chcksum & 0xffff) + (chcksum >> 16);
     }
-    //printf("cch1=%x\r\n", ((uint16_t) chcksum ^ 0xFFFF));
     chcksum = (chcksum ^ 0xFFFF);
+    //printf("expos=%x;chl=%x;cch1=%x\r\n", buff_pos, chck_len, chcksum);
     res =  (chcksum << 8) | (chcksum >> 8);
 
     return res;
@@ -237,9 +242,27 @@ static uint32_t sock_sendAck(uint8_t *buff, uint32_t p_len, uint16_t ldata) {
 #ifndef SACK_PERMIT_ENABLE
     uint8_t abuff[ETH_IP_TCP_HDR_BASE_LEN] = {0};
     memcpy(abuff, buff, ETH_IP_TCP_HDR_BASE_LEN);
+	struct tcpip_header* tcphdr = map_tcpip_header(abuff);
+    //uint16_t ldata = getSockLastDataLen(id);
+    uint32_t ack = tcphdr->ack_num;
+    uint8_t *ack_ptr = (uint8_t*)&(tcphdr->sequence);
+    uint8_t *ld_ptr = (uint8_t*)&(ldata);
+    uint8_t overfl = 0;
+
+    if (*(ack_ptr+3) + *(ld_ptr) > 255) {
+        overfl = 1;
+    }
+    *(ack_ptr+3) += *(ld_ptr);
+    if (*(ack_ptr+2) + *(ld_ptr+1) + overfl > 255) {
+        if (*(ack_ptr+1) == 255)
+            *(ack_ptr) += 1;
+        *(ack_ptr+1) += 1;
+    }
+    tcphdr->ack_num = tcphdr->sequence;
+#ifdef EXTRA_ACK_REQUIRED
     struct eth_header* eth = map_eth_header(abuff);
     struct ip_header* iphdr = map_ip_header(abuff);
-	struct tcpip_header* tcphdr = map_tcpip_header(abuff);
+	//struct tcpip_header* tcphdr = map_tcpip_header(abuff);
 
     memcpy((uint8_t*)&(eth->dst_mac), eth->src_mac, 6);
     memcpy((uint8_t*)&(eth->src_mac), int_addr->macaddr, 6);
@@ -257,28 +280,13 @@ static uint32_t sock_sendAck(uint8_t *buff, uint32_t p_len, uint16_t ldata) {
     tcphdr->flags = 0x0050;
     tcphdr->flags |= TCP_FLAG_ACK;
 
-    //uint16_t ldata = getSockLastDataLen(id);
-    uint32_t ack = tcphdr->ack_num;
-    uint8_t *ack_ptr = (uint8_t*)&(tcphdr->sequence);
-    uint8_t *ld_ptr = (uint8_t*)&(ldata);
-    uint8_t overfl = 0;
-
-    if (*(ack_ptr+3) + *(ld_ptr) > 255) {
-        overfl = 1;
-    }
-    *(ack_ptr+3) += *(ld_ptr);
-    if (*(ack_ptr+2) + *(ld_ptr+1) + overfl > 255) {
-        if (*(ack_ptr+1) == 255)
-            *(ack_ptr) += 1;
-        *(ack_ptr+1) += 1;
-    }
-    tcphdr->ack_num = tcphdr->sequence;
     tcphdr->sequence = ack;
 
     tcphdr->window = 0xf601; // 502 NBO;
     tcphdr->checksum = 0;
     tcphdr->checksum = transportCalcChecksum(abuff, ETH_IP_TCP_HDR_BASE_LEN); // ACK packet have no data
     enc28j60PacketSend(ETH_IP_TCP_HDR_BASE_LEN,abuff);
+#endif
     return tcphdr->ack_num;
 #else
 	uint8_t *ld_ptr = (uint8_t*)&(ldata);
@@ -301,7 +309,7 @@ static uint32_t sock_sendAck(uint8_t *buff, uint32_t p_len, uint16_t ldata) {
 #endif
 }
 
-static void sock_makeTcpHeader(uint8_t *buff, uint32_t p_len, uint8_t sockid, uint16_t data_len, uint8_t flags) {
+static void sock_makeTcpHeader(uint8_t *buff, uint32_t p_len, uint8_t sockid, uint16_t data_len, uint16_t flags) {
     struct eth_header* eth = map_eth_header(buff);
     struct ip_header* iphdr = map_ip_header(buff);
 	struct tcpip_header* tcphdr = map_tcpip_header(buff);
@@ -322,9 +330,9 @@ static void sock_makeTcpHeader(uint8_t *buff, uint32_t p_len, uint8_t sockid, ui
     tcphdr->flags |= flags;
 
     uint32_t ack = tcphdr->ack_num;
-    uint8_t *ack_ptr = (uint8_t*)&(tcphdr->sequence);
+    /*uint8_t *ack_ptr = (uint8_t*)&(tcphdr->sequence);
     uint8_t *ld_ptr = (uint8_t*)&(data_len);
-    uint8_t overfl = 0;
+    uint8_t overfl = 0;*/
 
     /*if (*(ack_ptr+3) + *(ld_ptr) > 255) {
         overfl = 1;

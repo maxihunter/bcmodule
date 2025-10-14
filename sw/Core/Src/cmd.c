@@ -37,11 +37,16 @@ extern UART_HandleTypeDef huart1;
 extern uint8_t sect[512];
 extern FATFS *fs;
 
+static uint8_t *pbuf;
+static uint32_t pbuf_len = 0;
+
 static void print_help(char *cmd);
 static void print_version(char *cmd);
 static void print_date(char *cmd);
 static void print_link(char *cmd);
 static void handle_link(char *cmd);
+static void handle_ping(char *cmd);
+static void handle_arp(char *cmd);
 static void handle_switch1(char *cmd);
 static void handle_switch2(char *cmd);
 static void handle_switch3(char *cmd);
@@ -49,6 +54,7 @@ static void handle_switch3(char *cmd);
 static void print_sdfiles(char *cmd);
 
 const struct cmd_description cmd_list[] = {
+    {"arp", 0, &handle_arp},
     {"con1", 6, &handle_switch1},
     {"con2", 7, &handle_switch2},
     {"con3", 8, &handle_switch3},
@@ -57,12 +63,18 @@ const struct cmd_description cmd_list[] = {
     {"ipaddr", 1, &print_ipaddr},
     {"link", 4, &handle_link},
     {"ftp", 3, &print_help},
+    {"ping", 0, &handle_ping},
     {"sdinf", 5, &print_sdcard},
     {"sdls", 5, &print_sdfiles},
     {"usb", 2, &print_help},
     {"ver", 0, &print_version},
     {NULL, 255, NULL},
 };
+
+void cmd_init(uint8_t *buff, uint32_t pbuff_len) {
+    pbuf = buff;
+    pbuf_len = pbuff_len;
+}
 
 void cmd_process(char * cmd, uint8_t len) {
     char *cmd_ptr = cmd;
@@ -140,6 +152,30 @@ void handle_link(char *cmd) {
     }*/
     printf("PHY link: \r\n");
     /*
+    if (enc28j60linkup()) {
+        printf("UP\r\n");
+    } else {
+        printf("DOWN\r\n");
+    }*/
+}
+
+void handle_ping(char *cmd) {
+    printf("Ping: %s\r\n", cmd);
+
+    uint32_t ip = _inet_pton(cmd);
+    uint8_t mac[6] = {0};
+    if (getHostMacByArp(pbuf, pbuf_len, ip, &mac)) {
+        printf("Get MAC failed\r\n");
+        return;
+    }
+    icmpPingHost(ip, &mac);
+}
+
+void handle_arp(char *cmd) {
+    printf("ARP resolve: %s\r\n", cmd);
+
+    /*
+    uint8_t getHostMacByArp(uint8_t *buff, uint32_t len, uint32_t hostaddr, uint8_t *hostmac);
     if (enc28j60linkup()) {
         printf("UP\r\n");
     } else {

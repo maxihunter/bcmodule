@@ -37,6 +37,7 @@ struct cmd_description {
     cmdFunc proc;
 };
 
+void cmd_init(uint8_t *buff, uint32_t pbuff_len);
 void cmd_process(char * cmd, uint8_t len);
 void print_ipaddr(char *cmd);
 void print_sdcard(char *cmd);
