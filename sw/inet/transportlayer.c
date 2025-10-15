@@ -34,6 +34,7 @@
 //#define SACK_PERMIT_ENABLE
 
 static uint32_t sock_sendAck(uint8_t *buff, uint32_t p_len, uint16_t ldata);
+static uint32_t increase32BitValue(uint32_t val1, uint32_t val2);
 
 static struct inet_addr *int_addr = NULL;
 static uint8_t *pbuf;
@@ -55,12 +56,24 @@ uint8_t getSockState(uint8_t id) {
     return socks[id].state;
 }
 
-uint8_t getSockSeq(uint8_t id) {
+uint32_t getSockSeq(uint8_t id) {
     return socks[id].seq;
 }
 
 uint16_t getSockPort(uint8_t id) {
     return socks[id].port;
+}
+
+uint16_t getClientPort(uint8_t id) {
+    return socks[id].client_port;
+}
+
+uint8_t *getClientAddr(uint8_t id) {
+    return socks[id].client_ip;
+}
+
+uint8_t *getClientMac(uint8_t id) {
+    return socks[id].client_mac;
 }
 
 uint16_t getSockLastDataLen(uint8_t id) {
@@ -72,7 +85,8 @@ uint32_t getSockNextAck(uint8_t id) {
 }
 
 void sockSendData(uint8_t *buff, uint32_t len, uint8_t id) {
-    socks[id].seq += len - ETH_IP_TCP_HDR_BASE_LEN;
+    //socks[id].seq += len - ETH_IP_TCP_HDR_BASE_LEN;
+    socks[id].seq = increase32BitValue(socks[id].seq, len - ETH_IP_TCP_HDR_BASE_LEN);
     enc28j60PacketSend(len,buff);
 }
 
@@ -124,7 +138,7 @@ uint8_t socketRoutine(uint8_t *buff, uint32_t len) {
             tcphdr->window = 0x0005; // make window size double of standard MTU 1280
             tcphdr->ack_num = tcphdr->sequence + 0x01000000; // +1 in network order
                                                //
-            socks[i].seq = HAL_GetTick() << 16;
+            socks[i].seq = (HAL_GetTick() & 0xff) << 24;
             tcphdr->sequence = socks[i].seq;
             socks[i].seq += 0x01000000; // +1 in network order
             buff[ETH_IP_TCP_HDR_BASE_LEN]=2;
@@ -175,12 +189,12 @@ uint8_t socketRoutine(uint8_t *buff, uint32_t len) {
             tcphdr->ack_num = tcphdr->sequence + 0x01000000; // +1 in network order
             tcphdr->sequence = ack;
             tcphdr->checksum = 0;
-            tcphdr->checksum = transportCalcChecksum(buff, len);
+            tcphdr->checksum = transportCalcChecksum(buff, ETH_IP_TCP_HDR_BASE_LEN);
             enc28j60PacketSend(len,buff);
             return 0;
         }
-        if ( socks[i].state == SOCK_FIN && socks[i].state == SOCK_FIN && tcphdr->flags & TCP_FLAG_ACK) {
-            socks[i].state = SOCK_OPEN;
+        if ( socks[i].state == SOCK_FIN && tcphdr->flags & TCP_FLAG_FIN && tcphdr->flags & TCP_FLAG_ACK) {
+            socks[i].state = SOCK_LISTEN;
 			memcpy((uint8_t*)&(eth->dst_mac), eth->src_mac, 6);
             memcpy((uint8_t*)&(eth->src_mac), int_addr->macaddr, 6);
 
@@ -193,7 +207,7 @@ uint8_t socketRoutine(uint8_t *buff, uint32_t len) {
             tcphdr->window = 1460; // make window size double of standard MTU 2 x 1460
             tcphdr->sequence = socks[i].seq; //TCP_HDR_BASE_LEN
             tcphdr->checksum = 0;
-            tcphdr->checksum = transportCalcChecksum(buff, len);
+            tcphdr->checksum = transportCalcChecksum(buff, ETH_IP_TCP_HDR_BASE_LEN);
             enc28j60PacketSend(len,buff);
             socks[i].seq = 0;
             return 0;
@@ -222,10 +236,10 @@ uint16_t transportCalcChecksum(uint8_t *buff, uint32_t p_len) {
     while (buff_pos < p_len - 1) {
         //chcksum += *((uint16_t *)(buff + buff_pos)); // sht, need normal order, not network order...
         //printf("pos=%x;buf=%x;cch1=%x\r\n", buff_pos, *(buff+buff_pos), chcksum );
-        chcksum += 0xFFFF & (((uint32_t)*(buff+buff_pos)<<8)|*(buff+1+buff_pos));
+        chcksum += 0xFFFF & (((uint32_t)*(buff+buff_pos)<<8) | *(buff+1+buff_pos));
         buff_pos += 2;
     }
-    //printf("ex_pos=%x;buf=%x;cch1=%x\r\n", buff_pos, *(buff+buff_pos), chcksum );
+    //printf("pos=%x;buf=%x;cch1=%x\r\n", buff_pos, *(buff+buff_pos), chcksum );
     if(buff_pos == p_len - 1) {
         //printf("ex_pos=%x;buf=%x;cch1=%x\r\n", buff_pos, *(buff+buff_pos), chcksum );
         chcksum += 0xff00 & (*(buff + buff_pos) << 8);
@@ -295,7 +309,7 @@ static uint32_t sock_sendAck(uint8_t *buff, uint32_t p_len, uint16_t ldata) {
 	uint8_t ack_val[4];
 	uint8_t overfl = 0;
 	
-	memcpy((uint8_t*)&ack_val, (uint8_t*)&(tcphdr->sequence);, 4);
+	memcpy((uint8_t*)&ack_val, (uint8_t*)&(tcphdr->sequence), 4);
 	uint8_t *ack_ptr = ack_val;
 
     if (*(ack_ptr+3) + *(ld_ptr) > 255) {
@@ -363,3 +377,29 @@ void sock_forceCloseSock(uint8_t *buff, uint32_t p_len, uint8_t sockid) {
     sock_makeTcpHeader(buff, p_len, sockid, 0, TCP_FLAG_ACK | TCP_FLAG_RST);
 }
 
+static uint32_t increase32BitValue(uint32_t val1, uint32_t val2) {
+    //printf("HEXA %lx:%lx\r\n", val1, val2);
+	uint8_t *ld_ptr = (uint8_t*)&(val2);
+	uint8_t ack_val[4];
+	uint8_t overfl = 0;
+	uint16_t tester = 0;
+	
+	memcpy((uint8_t*)&ack_val, (uint8_t*)&(val1), 4);
+	//uint8_t *ack_ptr = ack_val;
+	uint8_t *ack_ptr = (uint8_t*)&(val1);
+
+    tester = *(ack_ptr+3) + *(ld_ptr);
+    if (tester > 255) {
+        overfl = 1;
+    }
+    //printf("HEX2 %lx:%lx\r\n", val1, val2);
+    *(ack_ptr+3) += *(ld_ptr);
+    if (*(ack_ptr+2) + *(ld_ptr+1) + overfl > 255) {
+        if (*(ack_ptr+1) == 255)
+            *(ack_ptr) += 1;
+        *(ack_ptr+1) += 1;
+    }
+    //printf("HEX3 %lx:%lx\r\n", val1, val2);
+	//return (uint32_t) ack_val;
+	return val1;
+}

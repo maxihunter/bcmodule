@@ -91,6 +91,7 @@ struct ftp_data {
     uint8_t curr_cmd;
     uint8_t curr_state;
     uint8_t data_transfer;
+    uint32_t data_transfer_ptr;
 };
 
 void ftpd_set_user_password(const char * pass);
