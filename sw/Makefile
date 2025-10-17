@@ -70,6 +70,7 @@ Core/Src/syscalls.c \
 enc28j60/enc28j60.c \
 inet/iplayer.c \
 inet/pkt_headers.c \
+config/config.c \
 sd/sd_card.c \
 inet/dhcpd.c \
 inet/ftpd.c \
@@ -167,6 +168,7 @@ C_INCLUDES =  \
 -IDrivers/CMSIS/Include \
 -Isd \
 -Iinet \
+-Iconfig \
 -Ienc28j60 \
 -IUSB_DEVICE/App \
 -IUSB_DEVICE/Target \
