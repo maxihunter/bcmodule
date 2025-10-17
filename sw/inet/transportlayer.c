@@ -34,7 +34,7 @@
 //#define SACK_PERMIT_ENABLE
 
 static uint32_t sock_sendAck(uint8_t *buff, uint32_t p_len, uint16_t ldata);
-static uint32_t increase32BitValue(uint32_t val1, uint32_t val2, uint8_t smallval);
+static uint32_t addBE32BitValue(uint32_t val1, uint32_t val2, uint8_t smallval);
 
 static struct inet_addr *int_addr = NULL;
 static uint8_t *pbuf;
@@ -53,15 +53,15 @@ void prepareTransportLayer(struct inet_addr * inaddr, uint8_t *buff, uint32_t pb
     /*
     uint32_t val1 = 0xff000000;
     uint32_t val2 = 0x000000ff;
-    uint32_t tt = increase32BitValue(val1, val2);
+    uint32_t tt = addBE32BitValue(val1, val2);
     printf("test1 increase! %lx:%lx=%lx\r\n", val1, val2, tt);
     val1 = 0xffee0000;
     val2 = 0x000033ff;
-    tt = increase32BitValue(val1, val2);
+    tt = addBE32BitValue(val1, val2);
     printf("test2 increase! %lx:%lx=%lx\r\n", val1, val2, tt);
     val1 = 0xffee0000;
     val2 = 0x00000001;
-    tt = increase32BitValue(val1, val2);
+    tt = addBE32BitValue(val1, val2);
     prntf("test3 increase! %lx:%lx=%lx\r\n", val1, val2, tt);*/
 }
 
@@ -99,13 +99,13 @@ uint32_t getSockNextAck(uint8_t id) {
 
 void sockSendData(uint8_t *buff, uint32_t len, uint8_t id) {
     //socks[id].seq += len - ETH_IP_TCP_HDR_BASE_LEN;
-    socks[id].seq = increase32BitValue(socks[id].seq, len - ETH_IP_TCP_HDR_BASE_LEN, 1);
+    socks[id].seq = addBE32BitValue(socks[id].seq, len - ETH_IP_TCP_HDR_BASE_LEN, 1);
     enc28j60PacketSend(len,buff);
 }
 
 void sockSendLongData(uint8_t *buff, uint32_t len, uint8_t id) {
     // TCP data length should be a second octed value: 0x100, 0x200, etc.
-    socks[id].seq = increase32BitValue(socks[id].seq, len - ETH_IP_TCP_HDR_BASE_LEN, 0);
+    socks[id].seq = addBE32BitValue(socks[id].seq, len - ETH_IP_TCP_HDR_BASE_LEN, 0);
     enc28j60PacketSend(len,buff);
 }
 
@@ -157,7 +157,7 @@ uint8_t socketRoutine(uint8_t *buff, uint32_t len) {
         tcphdr->window = 0x0005; // make window size double of standard MTU 1280
         tcphdr->ack_num = tcphdr->sequence + 0x01000000; // +1 in network order
                                            //
-        socks[i].next_ack = increase32BitValue(tcphdr->sequence, 1, 1);
+        socks[i].next_ack = addBE32BitValue(tcphdr->sequence, 1, 1);
         socks[i].seq = (HAL_GetTick() & 0xff) << 24;
         tcphdr->sequence = socks[i].seq;
         socks[i].seq += 0x01000000; // +1 in network order
@@ -235,14 +235,14 @@ uint8_t socketRoutine(uint8_t *buff, uint32_t len) {
         return 0;
     }
     if ( socks[i].state == SOCK_ESTABLISHED && (tcphdr->flags & TCP_FLAG_ACK) && !(tcphdr->flags & TCP_FLAG_PSH)) {
-        socks[i].next_ack = increase32BitValue(tcphdr->sequence, 1, 1);
+        socks[i].next_ack = addBE32BitValue(tcphdr->sequence, 1, 1);
         return 0;
     }
     if ( socks[i].state == SOCK_ESTABLISHED && (tcphdr->flags & TCP_FLAG_PSH)) {
         uint16_t dlen = INT16_ITON(iphdr->total_len);
         socks[i].last_data_len = (dlen - (IP_HDR_BASE_LEN+TCP_HDR_BASE_LEN));
         struct tcpip_header* tcphdr = map_tcpip_header(buff);
-        socks[i].next_ack = increase32BitValue(tcphdr->sequence, socks[i].last_data_len, 1);
+        socks[i].next_ack = addBE32BitValue(tcphdr->sequence, socks[i].last_data_len, 1);
         //printf("ACKs %x:%x:%x\r\n", iphdr->total_len, dlen, socks[i].last_data_len);
         //socks[i].next_ack = sock_sendAck(buff, len, socks[i].last_data_len);
         return i;
@@ -397,7 +397,8 @@ void sock_forceCloseSock(uint8_t *buff, uint32_t p_len, uint8_t sockid) {
     sock_makeTcpHeader(buff, p_len, sockid, 0, TCP_FLAG_ACK | TCP_FLAG_RST);
 }
 
-static uint32_t increase32BitValue(uint32_t val1, uint32_t val2, uint8_t smallval) {
+static uint32_t addBE32BitValue(uint32_t val1, uint32_t val2, uint8_t smallval) {
+#if 0
     // Maximum we can transfer 0x320 bytes at once
 	uint8_t *ack_ptr = (uint8_t*)&(val1);
 	uint8_t *ld_ptr = (uint8_t*)&(val2);
@@ -421,6 +422,12 @@ static uint32_t increase32BitValue(uint32_t val1, uint32_t val2, uint8_t smallva
         *(ack_ptr+i) += overfl;
     }
     *(ack_ptr+2) += *(ld_ptr+1);
-
 	return val1;
+#else
+	uint32_t be_host = __REV(val1); // BE → host (LE)
+    uint32_t le_host = val2;        // already LE
+    uint32_t sum = be_host + le_host;
+    return __REV(sum);  
+#endif	
 }
+

@@ -24,6 +24,8 @@ DEBUG = 1
 # optimization
 OPT = -Og
 
+ROM_S = 65535
+RAM_S = 20480
 
 #######################################
 # paths
@@ -232,6 +234,8 @@ $(BUILD_DIR)/%.hex: $(BUILD_DIR)/%.elf | $(BUILD_DIR)
 	
 $(BUILD_DIR)/%.bin: $(BUILD_DIR)/%.elf | $(BUILD_DIR)
 	$(BIN) $< $@	
+	$(shell $(SZ) $(BUILD_DIR)/bcm.elf > memory)
+	@python print_mem.py $(ROM_S) $(RAM_S)
 	
 $(BUILD_DIR):
 	mkdir $@		
