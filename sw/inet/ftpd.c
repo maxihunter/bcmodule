@@ -232,6 +232,7 @@ static void ftpd_prepareHeaders(uint8_t *buff, uint32_t p_len, uint16_t data_len
     uint16_t dp = tcphdr->dport;
     tcphdr->dport = getClientPort(id);
     tcphdr->sport = getSockPort(id);
+    tcphdr->flags = 0x0050;
     tcphdr->flags |= TCP_FLAG_ACK | TCP_FLAG_PSH;
 
     tcphdr->ack_num = getSockNextAck(id);
@@ -375,12 +376,12 @@ static void ftpd_sendLIST(uint8_t *buff, uint32_t p_len, uint8_t id, uint8_t ver
 }
 
 static void ftpd_sendSending(uint8_t *buff, uint32_t p_len, uint8_t id) {
-    ftpd_prepareHeaders(buff, p_len, 13, id);
+    ftpd_prepareHeaders(buff, p_len, 16, id);
     struct tcpip_header* tcphdr = map_tcpip_header(buff);
-    memcpy((uint8_t*)(tcphdr)+TCP_HDR_BASE_LEN, "150 Sending\r\n", 13);
+    memcpy((uint8_t*)(tcphdr)+TCP_HDR_BASE_LEN, "150 Open ASCII\r\n", 16);
     tcphdr->checksum = 0;
-    tcphdr->checksum = transportCalcChecksum(buff, ETH_IP_TCP_HDR_BASE_LEN + 13);
-    sockSendData(buff, ETH_IP_TCP_HDR_BASE_LEN + 13, id);
+    tcphdr->checksum = transportCalcChecksum(buff, ETH_IP_TCP_HDR_BASE_LEN + 16);
+    sockSendData(buff, ETH_IP_TCP_HDR_BASE_LEN + 16, id);
 }
 
 static void ftpd_sendComplete(uint8_t *buff, uint32_t p_len, uint8_t id) {
@@ -486,6 +487,15 @@ static void ftpd_dataLIST(uint8_t *buff, uint32_t p_len, uint8_t id, uint8_t ver
         char * flags;
         uint8_t len = 0;
         printf("LIST ENTER1\r\n");
+        uint16_t buff_ptr = 0;
+        snprintf(fbuf, 512, "drwxrwxr-x   3   1000  1000  4096   Jul 1  2025  .\r\n");
+        len = strlen(fbuf);
+        memcpy((uint8_t*)(tcphdr)+TCP_HDR_BASE_LEN+buff_ptr, fbuf, len);
+        buff_ptr += len;
+        snprintf(fbuf, 512, "drwxrwxr-x   3   1000  1000  4096   Jul 1  2025  ..\r\n");
+        len = strlen(fbuf);
+        memcpy((uint8_t*)(tcphdr)+TCP_HDR_BASE_LEN+buff_ptr, fbuf, len);
+        buff_ptr += len;
         while(1)
         {
             result = f_readdir(&dir, &fileInfo);
@@ -493,25 +503,26 @@ static void ftpd_dataLIST(uint8_t *buff, uint32_t p_len, uint8_t id, uint8_t ver
             {
                 if(fileInfo.fattrib&AM_DIR)
                 {
-                    flags = "[DIR]";
+                    flags = "drwxrwxr-x";
                 } else {
-                    flags = " --- ";
+                    flags = "-rwxrwxr-x";
                 }
                 fn = fileInfo.lfname;
                 if(!strlen(fn))
                     fn = fileInfo.fname;
-                snprintf(fbuf, 512, "%s %s\r\n", flags, fn);
+                snprintf(fbuf, 512, "%s   3   1000  1000  4096   Jul 1  2025  %s\r\n", flags, fn);
                 len = strlen(fbuf);
-                ftpd_prepareHeaders(buff, p_len, len, id);
-                memcpy((uint8_t*)(tcphdr)+TCP_HDR_BASE_LEN, fbuf, len);
-                tcphdr->checksum = 0;
-                tcphdr->checksum = transportCalcChecksum(buff, ETH_IP_TCP_HDR_BASE_LEN + len);
-                printf("LIST SEND2\r\n");
-                sockSendData(buff, ETH_IP_TCP_HDR_BASE_LEN + len, id);
+                memcpy((uint8_t*)(tcphdr)+TCP_HDR_BASE_LEN+buff_ptr, fbuf, len);
+                buff_ptr += len;
             }
             else break;
         }
         f_closedir(&dir);
+        ftpd_prepareHeaders(buff, p_len, buff_ptr, id);
+        tcphdr->checksum = 0;
+        tcphdr->checksum = transportCalcChecksum(buff, ETH_IP_TCP_HDR_BASE_LEN + buff_ptr);
+        printf("LIST SEND2\r\n");
+        sockSendData(buff, ETH_IP_TCP_HDR_BASE_LEN + buff_ptr, id);
     }
     sock_softCloseSock(buff, p_len, id);
 }
@@ -564,6 +575,7 @@ static void ftpd_processCommand(uint8_t *buff, uint32_t p_len, uint8_t id) {
             ftpd_sendSending(buff, p_len, id);
             ftpd_handleDataStream(buff, p_len, data_sock);
             ftpd_sendComplete(buff, p_len, id);
+            ftp_user.curr_cmd = 0;
 			break;
 		case TYPE_CMD:
             ftpd_sendTYPE(buff, p_len, id);

@@ -22,6 +22,7 @@
  */
 
 #include "config.h"
+#include <stdio.h>
 
 struct main_config config_t;
 
@@ -31,9 +32,11 @@ void config_show(char *cmd) {
           "ipaddr=%d.%d.%d.%d\r\n"
           "mask=%d.%d.%d.%d\r\n"
           "gwaddr=%d.%d.%d.%d\r\n",
-          PRINTABLE_IPADDR(config_t.ipaddr),
-          PRINTABLE_IPADDR(config_t.mask),
-          PRINTABLE_IPADDR(config_t.gwaddr));
+          config_t.ipaddr[0],config_t.ipaddr[1],config_t.ipaddr[2],config_t.ipaddr[3],
+          config_t.ipmask[0],config_t.ipmask[1],config_t.ipmask[2],config_t.ipmask[3],
+          config_t.gwaddr[0],config_t.gwaddr[1],config_t.gwaddr[2],config_t.gwaddr[3]
+          );
+
     printf("fpass=%s\r\n", config_t.ftp_pass );
 }
 
@@ -53,7 +56,7 @@ void config_set_ipaddr(char *cmd)
 
 void config_set_mask(char *cmd)
 {
-	memcpy(config_t.mask, (uint8_t *)cmd, 4);
+	memcpy(config_t.ipmask, (uint8_t *)cmd, 4);
 }
 
 void config_set_gwaddr(char *cmd)

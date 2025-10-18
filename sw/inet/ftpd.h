@@ -49,7 +49,7 @@
 
 
 enum ftp_cmd {
-	USER_CMD,
+	USER_CMD = 1,
 //	ACCT_CMD,
 	PASS_CMD,
 	TYPE_CMD,
