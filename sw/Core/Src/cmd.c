@@ -52,6 +52,7 @@ static void handle_arp(char *cmd);
 static void handle_switch1(char *cmd);
 static void handle_switch2(char *cmd);
 static void handle_switch3(char *cmd);
+static void handle_reset(char *cmd);
 static void print_sdfiles(char *cmd);
 
 const struct cmd_description cmd_list[] = {
@@ -67,6 +68,7 @@ const struct cmd_description cmd_list[] = {
     {"link", 4, &handle_link},
     {"ftp", 3, &print_help},
     {"ping", 0, &handle_ping},
+	{"reset", 0, &handle_reset},
 	{"save", 5, &config_save},
     {"sdinf", 5, &print_sdcard},
     {"sdls", 5, &print_sdfiles},
@@ -243,6 +245,12 @@ void handle_switch3(char *cmd) {
     } else {
         printf("CLOSE\r\n");
     }
+}
+
+void handle_reset(char *cmd) {
+	printf("System reset\r\n");
+	HAL_Delay(500);
+    HAL_NVIC_SystemReset();
 }
 
 void print_sdcard(char *cmd) {
