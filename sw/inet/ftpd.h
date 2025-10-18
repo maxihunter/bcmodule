@@ -49,7 +49,7 @@
 
 
 enum ftp_cmd {
-	USER_CMD,
+	USER_CMD = 1,
 //	ACCT_CMD,
 	PASS_CMD,
 	TYPE_CMD,
@@ -81,6 +81,10 @@ enum ftp_cmd {
 	NO_CMD,
 	MAX_CMD = 255,
 };
+
+#define FTP_DATA_IDLE 0
+#define FTP_DATA_TRANSMIT 1
+#define FTP_DATA_FINISHED 2
 
 struct ftp_data {
     char username[4];

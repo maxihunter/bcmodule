@@ -40,10 +40,10 @@ static struct inet_addr *int_addr = NULL;
 static uint8_t *pbuf;
 static uint32_t pbuf_len = 0;
 static struct socket socks[] = {
-    {0, 0, 0, 0, 0, 0, {0}, {0}, 0  }, // Service socket. Do not use
-    { 0xff10 /*4351 network order*/, IP_PROTO_TYPE_TCP, SOCK_LISTEN, 0, 0, 0, {0}, {0}, 0 },
-    { 0x1500 /*21 network order*/, IP_PROTO_TYPE_TCP, SOCK_LISTEN, 0, 0, 0, {0}, {0}, 0 },
-    {65535, 0, 0, 0, 0, 0, {0}, {0}, 0  } // EMPTY
+    {0, 0, 0, 0, 0, 0, {0}, {0}, 0, 0  }, // Service socket. Do not use
+    { 0xff10 /*4351 network order*/, IP_PROTO_TYPE_TCP, SOCK_LISTEN, 0, 0, 0, {0}, {0}, 0, 0x1000 },
+    { 0x1500 /*21 network order*/, IP_PROTO_TYPE_TCP, SOCK_LISTEN, 0, 0, 0, {0}, {0}, 0, 0x1100 },
+    {65535, 0, 0, 0, 0, 0, {0}, {0}, 0, 0 } // EMPTY
 };
 
 void prepareTransportLayer(struct inet_addr * inaddr, uint8_t *buff, uint32_t pbuff_len) {
@@ -100,6 +100,9 @@ uint32_t getSockNextAck(uint8_t id) {
 void sockSendData(uint8_t *buff, uint32_t len, uint8_t id) {
     //socks[id].seq += len - ETH_IP_TCP_HDR_BASE_LEN;
     socks[id].seq = addBE32BitValue(socks[id].seq, len - ETH_IP_TCP_HDR_BASE_LEN, 1);
+    struct ip_header* iphdr = map_ip_header(buff);
+    //socks[id].ip_id++;
+    //iphdr->id = __REV16(socks[id].ip_id);
     enc28j60PacketSend(len,buff);
 }
 
@@ -215,9 +218,9 @@ uint8_t socketRoutine(uint8_t *buff, uint32_t len) {
         enc28j60PacketSend(len,buff);
         return 0;
     }
-    if ( socks[i].state == SOCK_FIN && tcphdr->flags & TCP_FLAG_FIN && tcphdr->flags & TCP_FLAG_ACK) {
+    if ( socks[i].state == SOCK_FIN && tcphdr->flags & TCP_FLAG_ACK) {
         socks[i].state = SOCK_LISTEN;
-        memcpy((uint8_t*)&(eth->dst_mac), eth->src_mac, 6);
+        /*memcpy((uint8_t*)&(eth->dst_mac), eth->src_mac, 6);
         memcpy((uint8_t*)&(eth->src_mac), int_addr->macaddr, 6);
 
         memcpy((uint8_t*)&(iphdr->dst_ip), (uint8_t*)&(iphdr->src_ip), 4);
@@ -230,7 +233,7 @@ uint8_t socketRoutine(uint8_t *buff, uint32_t len) {
         tcphdr->sequence = socks[i].seq; //TCP_HDR_BASE_LEN
         tcphdr->checksum = 0;
         tcphdr->checksum = transportCalcChecksum(buff, ETH_IP_TCP_HDR_BASE_LEN);
-        enc28j60PacketSend(len,buff);
+        //enc28j60PacketSend(len,buff);*/
         socks[i].seq = 0;
         return 0;
     }
@@ -386,6 +389,7 @@ static void sock_makeTcpHeader(uint8_t *buff, uint32_t p_len, uint8_t sockid, ui
     tcphdr->checksum = 0;
     tcphdr->checksum = transportCalcChecksum(buff, ETH_IP_TCP_HDR_BASE_LEN); // ACK packet have no data
     enc28j60PacketSend(ETH_IP_TCP_HDR_BASE_LEN,buff);
+    socks[sockid].state = SOCK_FIN;
     //return tcphdr->ack_num;
 }
 
@@ -397,7 +401,7 @@ void sock_forceCloseSock(uint8_t *buff, uint32_t p_len, uint8_t sockid) {
     sock_makeTcpHeader(buff, p_len, sockid, 0, TCP_FLAG_ACK | TCP_FLAG_RST);
 }
 
-static uint32_t addBE32BitValue(uint32_t val1, uint32_t val2, uint8_t smallval) {
+static uint32_t addBE32BitValue(uint32_t val1, uint32_t val2, uint8_t /*smallval*/) {
 #if 0
     // Maximum we can transfer 0x320 bytes at once
 	uint8_t *ack_ptr = (uint8_t*)&(val1);

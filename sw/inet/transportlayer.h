@@ -46,6 +46,7 @@ struct socket {
     uint8_t client_ip[4];
     uint8_t client_mac[6];
     uint16_t client_port;
+    uint16_t ip_id;
 };
 
 /* SOCK */

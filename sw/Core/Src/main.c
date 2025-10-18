@@ -74,7 +74,7 @@ static uint8_t cmd_ptr = 0;
 struct inet_addr net_addr = {0};
 static const uint8_t mac[] = {0xD2, 0x18, 0XBB, 0x55, 0x66, 0x77};
 static long lastDhcpRequest = 0;
-#define PBUFF_LEN 400
+#define PBUFF_LEN 1400
 static uint8_t pbuf[PBUFF_LEN] = {0};
 static uint16_t plen = 0;
 static char * fpass = "1234";

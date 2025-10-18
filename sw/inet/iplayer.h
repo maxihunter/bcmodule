@@ -45,6 +45,7 @@ struct inet_addr {
 void fillEthHeader(uint8_t *buff, uint32_t len, struct inet_addr * inaddr, uint8_t *dstmac, uint16_t ethtype);
 void fillEthHeaderReply(uint8_t *buff, uint32_t len, struct inet_addr * inaddr);
 void fillEthHeaderBroadcast(uint8_t *buff, uint32_t len, struct inet_addr * inaddr, uint16_t ethtype);
+void fillIpDefaultHeader(uint8_t *buff, uint32_t len, uint8_t ip_proto);
 
 /* IP */
 void prepareIpLayer(struct inet_addr * inaddr, uint8_t *buff, uint32_t pbuff_len);

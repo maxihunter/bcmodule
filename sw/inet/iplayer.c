@@ -34,6 +34,8 @@
 static uint8_t *pbuf;
 static uint32_t pbuf_len = 0;
 static struct inet_addr *int_addr;
+static const char def_iphdr[] ={0x45,0,0,0x28,0,0,0x40,0,0x80,06};
+
 
 inline uint8_t simple_pow(uint8_t ind, uint8_t pow) {
     if (pow == 0)
@@ -62,6 +64,12 @@ void fillEthHeaderBroadcast(uint8_t *buff, uint32_t len, struct inet_addr * inad
 	memcpy(eth->src_mac, inaddr->macaddr, 6);
 	memset(eth->dst_mac, 0xff, 6);
 	eth->ethertype = ethtype;
+}
+
+void fillIpDefaultHeader(uint8_t *buff, uint32_t len, uint8_t ip_proto) {
+    struct ip_header* iphdr = map_ip_header(pbuf);
+    memcpy((uint8_t*)&(iphdr), def_iphdr, sizeof(def_iphdr));
+    iphdr->protocol = ip_proto;
 }
 
 void prepareIpLayer(struct inet_addr * inaddr, uint8_t *buff, uint32_t pbuff_len) {
