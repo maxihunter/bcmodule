@@ -40,6 +40,7 @@ struct main_config {
 	uint8_t ipmask[4];
 	uint8_t gwaddr[4];
 	char ftp_pass[8];
+	uint8_t ftp_timeout;
 } __attribute__((packed));
 
 void config_show(char *cmd);
@@ -50,6 +51,7 @@ void config_set_ipaddr(char *cmd);
 void config_set_mask(char *cmd);
 void config_set_gwaddr(char *cmd);
 void config_set_ftp_pass(char *cmd);
+void config_set_ftp_timeout(char *cmd);
 
 #endif // __CONFIG_H__
 

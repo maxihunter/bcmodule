@@ -68,3 +68,8 @@ void config_set_ftp_pass(char *cmd)
 {
 	strncpy(config_t.ftp_pass, (uint8_t *)cmd, 4);
 }
+
+void config_set_ftp_timeout(char *cmd) 
+{
+	config_t.ftp_timeout = '0' - *cmd;
+}

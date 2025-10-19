@@ -82,6 +82,10 @@ enum ftp_cmd {
 	MAX_CMD = 255,
 };
 
+#define FTP_DATA_IDLE 0
+#define FTP_DATA_TRANSMIT 1
+#define FTP_DATA_FINISHED 2
+
 struct ftp_data {
     char username[4];
     unsigned long last_seen;
