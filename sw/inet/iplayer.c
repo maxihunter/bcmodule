@@ -35,6 +35,7 @@ static uint8_t *pbuf;
 static uint32_t pbuf_len = 0;
 static struct inet_addr *int_addr;
 static const char def_iphdr[] ={0x45,0,0,0x28,0,0,0x40,0,0x80,06};
+static uint16_t ip_id_index = 10;
 
 
 inline uint8_t simple_pow(uint8_t ind, uint8_t pow) {
@@ -66,10 +67,29 @@ void fillEthHeaderBroadcast(uint8_t *buff, uint32_t len, struct inet_addr * inad
 	eth->ethertype = ethtype;
 }
 
-void fillIpDefaultHeader(uint8_t *buff, uint32_t len, uint8_t ip_proto) {
-    struct ip_header* iphdr = map_ip_header(pbuf);
-    memcpy((uint8_t*)&(iphdr), def_iphdr, sizeof(def_iphdr));
+void fillIpDefaultHeader(uint8_t *buff, uint32_t len) {
+    memcpy(buff+ETH_HDR_BASE_LEN, def_iphdr, sizeof(def_iphdr));
+}
+
+void fillIpHeader(uint8_t *buff, uint32_t p_len, uint32_t c_ip, uint8_t *c_mac, uint8_t ip_proto) {
+    fillIpDefaultHeader(buff, p_len);
+    struct eth_header* eth = map_eth_header(buff);
+    struct ip_header* iphdr = map_ip_header(buff);
+
+    memcpy((uint8_t*)&(eth->dst_mac), c_mac, 6);
+    memcpy((uint8_t*)&(eth->src_mac), int_addr->macaddr, 6);
+    eth->ethertype = ETHERTYPE_IPV4;
+
+    memcpy((uint8_t*)&(iphdr->dst_ip), c_ip, 4);
+    memcpy((uint8_t*)&(iphdr->src_ip), (uint8_t*)&(int_addr->ipaddr), 4);
+
+    iphdr->total_len = __REV16(40+p_len); 
     iphdr->protocol = ip_proto;
+    ip_id_index++;
+    iphdr->id = __REV16(ip_id_index);
+
+    iphdr->checksum = 0;
+    iphdr->checksum = ipCalcChecksum(buff);
 }
 
 void prepareIpLayer(struct inet_addr * inaddr, uint8_t *buff, uint32_t pbuff_len) {
