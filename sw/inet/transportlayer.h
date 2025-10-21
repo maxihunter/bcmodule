@@ -57,6 +57,7 @@ uint16_t getClientPort(uint8_t id);
 uint8_t *getClientAddr(uint8_t id);
 uint8_t *getClientMac(uint8_t id);
 
+void fillTcpPacket(uint8_t *buff, uint32_t len, uint32_t p_len, uint8_t sockid);
 void sockSendData(uint8_t *buff, uint32_t len, uint8_t id);
 void prepareTransportLayer(struct inet_addr * inaddr, uint8_t *buff, uint32_t pbuff_len);
 uint8_t socketRoutine(uint8_t *buff, uint32_t len);

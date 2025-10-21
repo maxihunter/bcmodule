@@ -112,6 +112,24 @@ void sockSendLongData(uint8_t *buff, uint32_t len, uint8_t id) {
     enc28j60PacketSend(len,buff);
 }
 
+void fillTcpPacket(uint8_t *buff, uint32_t len, uint32_t p_len, uint8_t sockid) {
+    fillIpHeader(buff, p_len, (uint32_t)socks[sockid].client_ip, socks[sockid].client_mac, IP_PROTO_TYPE_TCP);
+    struct tcpip_header* tcphdr = map_tcpip_header(buff);
+    tcphdr->dport = socks[sockid].client_port;
+    tcphdr->sport = socks[sockid].port;
+    tcphdr->flags = 0x0050;
+    tcphdr->flags |= TCP_FLAG_ACK | TCP_FLAG_PSH;
+
+    tcphdr->ack_num = socks[sockid].next_ack;
+    if (tcphdr->ack_num == 0)
+        tcphdr->ack_num = tcphdr->sequence;
+    tcphdr->sequence = socks[sockid].seq;
+
+    tcphdr->window = 0xf601; // 502 NBO;
+    tcphdr->checksum = 0;
+    tcphdr->checksum = transportCalcChecksum(buff, ETH_IP_TCP_HDR_BASE_LEN + p_len);
+}
+
 uint8_t socketRoutine(uint8_t *buff, uint32_t len) {
     if (len < 60)
         return 0;
@@ -362,76 +380,39 @@ static uint32_t sock_sendAck(uint8_t *buff, uint32_t p_len, uint16_t ldata) {
 }
 
 static void sock_makeTcpHeader(uint8_t *buff, uint32_t p_len, uint8_t sockid, uint16_t data_len, uint16_t flags) {
-    struct eth_header* eth = map_eth_header(buff);
-    struct ip_header* iphdr = map_ip_header(buff);
-	struct tcpip_header* tcphdr = map_tcpip_header(buff);
-
-    memcpy((uint8_t*)&(eth->dst_mac), &socks[sockid].client_mac, 6);
-    memcpy((uint8_t*)&(eth->src_mac), int_addr->macaddr, 6);
-
-    memcpy((uint8_t*)&(iphdr->dst_ip), &socks[sockid].client_ip, 4);
-    memcpy((uint8_t*)&(iphdr->src_ip), (uint8_t*)&(int_addr->ipaddr), 4);
-
-    iphdr->total_len = 0x2800; // 40 in network order INT16_ITON
-
-    iphdr->checksum = 0;
-    iphdr->checksum = ipCalcChecksum(buff);
+    fillIpHeader(buff, data_len, (uint32_t)socks[sockid].client_ip, socks[sockid].client_mac, IP_PROTO_TYPE_TCP);
+    struct tcpip_header* tcphdr = map_tcpip_header(buff);
     tcphdr->dport = socks[sockid].client_port;
     tcphdr->sport = socks[sockid].port;
     tcphdr->flags = 0x0050;
     tcphdr->flags |= flags;
 
-    //uint32_t ack = tcphdr->ack_num;
     tcphdr->ack_num = socks[sockid].next_ack;
+    if (tcphdr->ack_num == 0)
+        tcphdr->ack_num = tcphdr->sequence;
     tcphdr->sequence = socks[sockid].seq;
 
     tcphdr->window = 0xf601; // 502 NBO;
     tcphdr->checksum = 0;
-    tcphdr->checksum = transportCalcChecksum(buff, ETH_IP_TCP_HDR_BASE_LEN); // ACK packet have no data
-    enc28j60PacketSend(ETH_IP_TCP_HDR_BASE_LEN,buff);
-    socks[sockid].state = SOCK_FIN;
-    //return tcphdr->ack_num;
+    tcphdr->checksum = transportCalcChecksum(buff, ETH_IP_TCP_HDR_BASE_LEN + data_len);
 }
 
 void sock_softCloseSock(uint8_t *buff, uint32_t p_len, uint8_t sockid) {
     sock_makeTcpHeader(buff, p_len, sockid, 0, TCP_FLAG_ACK | TCP_FLAG_FIN);
+    enc28j60PacketSend(ETH_IP_TCP_HDR_BASE_LEN,buff);
+    socks[sockid].state = SOCK_FIN;
 }
 
 void sock_forceCloseSock(uint8_t *buff, uint32_t p_len, uint8_t sockid) {
     sock_makeTcpHeader(buff, p_len, sockid, 0, TCP_FLAG_ACK | TCP_FLAG_RST);
+    enc28j60PacketSend(ETH_IP_TCP_HDR_BASE_LEN,buff);
+    socks[sockid].state = SOCK_FIN;
 }
 
 static uint32_t addBE32BitValue(uint32_t val1, uint32_t val2, uint8_t /*smallval*/) {
-#if 0
-    // Maximum we can transfer 0x320 bytes at once
-	uint8_t *ack_ptr = (uint8_t*)&(val1);
-	uint8_t *ld_ptr = (uint8_t*)&(val2);
-	uint8_t overfl = 0;
-	uint16_t tester = 0;
-
-    if (smallval) {
-        tester = *(ack_ptr+3) + *(ld_ptr);
-        for (int i = 2; i > -1; i--) {
-            overfl = tester >> 8;
-            tester = *(ack_ptr+i) + overfl;
-            ack_ptr[i] += overfl;
-        }
-        *(ack_ptr+3) += *(ld_ptr);
-    }
-
-    tester = *(ack_ptr+2) + *(ld_ptr+1);
-    for (int i = 1; i > -1; i--) {
-        overfl = tester >> 8;
-        tester = *(ack_ptr+i) + overfl;
-        *(ack_ptr+i) += overfl;
-    }
-    *(ack_ptr+2) += *(ld_ptr+1);
-	return val1;
-#else
-	uint32_t be_host = __REV(val1); // BE → host (LE)
+    uint32_t be_host = __REV(val1); // BE → host (LE)
     uint32_t le_host = val2;        // already LE
     uint32_t sum = be_host + le_host;
-    return __REV(sum);  
-#endif	
+    return __REV(sum);
 }
 

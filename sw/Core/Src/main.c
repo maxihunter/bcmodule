@@ -216,6 +216,7 @@ int main(void)
   enc28j60_set_spi(&hspi2);
   enc28j60Init(mac);
   printf("PHY module rev.%c\r\n", 'A' + enc28j60getrev());
+  printf("PBUFF address 0x%lx\r\n", &pbuf);
   printf("Network OK\r\n");
   //enc28j60DisableBroadcast();
   //enc28j60DisableMulticast();

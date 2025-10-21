@@ -249,70 +249,48 @@ static void ftpd_prepareHeaders(uint8_t *buff, uint32_t p_len, uint16_t data_len
 }
 
 static void ftpd_sendGreeting(uint8_t *buff, uint32_t p_len, uint8_t id) {
-    ftpd_prepareHeaders(buff, p_len, 12, id);
-    struct tcpip_header* tcphdr = map_tcpip_header(buff);
-    memcpy((uint8_t*)(tcphdr)+TCP_HDR_BASE_LEN, FTP_GREETINGS_OK" bcmFTP\r\n", 12);
-    tcphdr->checksum = 0;
-    tcphdr->checksum = transportCalcChecksum(buff, ETH_IP_TCP_HDR_BASE_LEN + 12);
+    memcpy(buff + ETH_IP_TCP_HDR_BASE_LEN, "220 bcmFTP\r\n", 12);
+    fillTcpPacket(buff, p_len, 12, id);
     sockSendData(buff, ETH_IP_TCP_HDR_BASE_LEN + 12, id);
-    //enc28j60PacketSend(ETH_IP_TCP_HDR_BASE_LEN + 12,buff);
 }
 
 // 530
 static void ftpd_sendCredRequired(uint8_t *buff, uint32_t p_len, uint8_t id) {
-    ftpd_prepareHeaders(buff, p_len, 17, id);
-    struct tcpip_header* tcphdr = map_tcpip_header(buff);
-    memcpy((uint8_t*)(tcphdr)+TCP_HDR_BASE_LEN, FTP_NOT_LOGGED_IN" unathorized\r\n", 17);
-    tcphdr->checksum = 0;
-    tcphdr->checksum = transportCalcChecksum(buff, ETH_IP_TCP_HDR_BASE_LEN + 17);
+    memcpy(buff + ETH_IP_TCP_HDR_BASE_LEN, "530 unathorized\r\n", 17);
+    fillTcpPacket(buff, p_len, 17, id);
     sockSendData(buff, ETH_IP_TCP_HDR_BASE_LEN + 17, id);
 }
 
 // 331
 static void ftpd_sendPassRequired(uint8_t *buff, uint32_t p_len, uint8_t id) {
-    ftpd_prepareHeaders(buff, p_len, 16, id);
-    struct tcpip_header* tcphdr = map_tcpip_header(buff);
-    memcpy((uint8_t*)(tcphdr)+TCP_HDR_BASE_LEN, FTP_USER_PASS_REQ" need passw\r\n", 16);
-    tcphdr->checksum = 0;
-    tcphdr->checksum = transportCalcChecksum(buff, ETH_IP_TCP_HDR_BASE_LEN + 16);
+    memcpy(buff + ETH_IP_TCP_HDR_BASE_LEN, "331 need passw\r\n", 16);
+    fillTcpPacket(buff, p_len, 16, id);
     sockSendData(buff, ETH_IP_TCP_HDR_BASE_LEN + 16, id);
 }
 
 static void ftpd_sendLoginSuccessfull(uint8_t *buff, uint32_t p_len, uint8_t id) {
-    ftpd_prepareHeaders(buff, p_len, 8, id);
-    struct tcpip_header* tcphdr = map_tcpip_header(buff);
-    memcpy((uint8_t*)(tcphdr)+TCP_HDR_BASE_LEN, FTP_USER_LOGIN_OK" OK\r\n", 8);
-    tcphdr->checksum = 0;
-    tcphdr->checksum = transportCalcChecksum(buff, ETH_IP_TCP_HDR_BASE_LEN + 8);
+    memcpy(buff + ETH_IP_TCP_HDR_BASE_LEN, "230 OK\r\n", 8);
+    fillTcpPacket(buff, p_len, 8, id);
     sockSendData(buff, ETH_IP_TCP_HDR_BASE_LEN + 8, id);
 }
 
 static void ftpd_sendCmdNotSupported(uint8_t *buff, uint32_t p_len, uint8_t id) {
-    ftpd_prepareHeaders(buff, p_len, 14, id);
-    struct tcpip_header* tcphdr = map_tcpip_header(buff);
-    memcpy((uint8_t*)(tcphdr)+TCP_HDR_BASE_LEN, FTP_COMMAND_NOT_SUPPORTED" Not impl\r\n", 14);
-    tcphdr->checksum = 0;
-    tcphdr->checksum = transportCalcChecksum(buff, ETH_IP_TCP_HDR_BASE_LEN + 14);
+    memcpy(buff + ETH_IP_TCP_HDR_BASE_LEN, "502 Not impl\r\n", 14);
+    fillTcpPacket(buff, p_len, 14, id);
     sockSendData(buff, ETH_IP_TCP_HDR_BASE_LEN + 14, id);
 }
 
 static void ftpd_sendQUIT(uint8_t *buff, uint32_t p_len, uint8_t id) {
-    ftpd_prepareHeaders(buff, p_len, 9, id);
-    struct tcpip_header* tcphdr = map_tcpip_header(buff);
-    memcpy((uint8_t*)(tcphdr)+TCP_HDR_BASE_LEN, "221 Bye\r\n", 9);
-    tcphdr->checksum = 0;
-    tcphdr->checksum = transportCalcChecksum(buff, ETH_IP_TCP_HDR_BASE_LEN + 9);
+    memcpy(buff + ETH_IP_TCP_HDR_BASE_LEN, "221 Bye\r\n", 9);
+    fillTcpPacket(buff, p_len, 9, id);
     sockSendData(buff, ETH_IP_TCP_HDR_BASE_LEN + 9, id);
     //Force finish
     sock_softCloseSock(buff, p_len, id);
 }
 
 static void ftpd_sendSYST(uint8_t *buff, uint32_t p_len, uint8_t id) {
-    ftpd_prepareHeaders(buff, p_len, 20, id);
-    struct tcpip_header* tcphdr = map_tcpip_header(buff);
-    memcpy((uint8_t*)(tcphdr)+TCP_HDR_BASE_LEN, FTP_SYSTEM_TYPE" STM32 Type: L8\r\n", 20);
-    tcphdr->checksum = 0;
-    tcphdr->checksum = transportCalcChecksum(buff, ETH_IP_TCP_HDR_BASE_LEN + 20);
+    memcpy(buff + ETH_IP_TCP_HDR_BASE_LEN, "215 STM32 Type: L8\r\n", 20);
+    fillTcpPacket(buff, p_len, 20, id);
     sockSendData(buff, ETH_IP_TCP_HDR_BASE_LEN + 20, id);
 }
 
@@ -342,58 +320,45 @@ static void ftpd_sendPASV(uint8_t *buff, uint32_t p_len, uint8_t id) {
     ports[1] = (getSockPort(data_sock) >> 8);
     snprintf(msg, 64, "227 Passive mod (%d,%d,%d,%d,%d,%d)\r\n", PRINTABLE_IPADDR(int_addr->ipaddr), ports[0], ports[1] );
     uint8_t msg_len = strlen(msg);
-    ftpd_prepareHeaders(buff, p_len, msg_len, id);
+
     struct tcpip_header* tcphdr = map_tcpip_header(buff);
     memcpy((uint8_t*)(tcphdr)+TCP_HDR_BASE_LEN, msg, msg_len);
-    tcphdr->checksum = 0;
-    tcphdr->checksum = transportCalcChecksum(buff, ETH_IP_TCP_HDR_BASE_LEN + msg_len);
+    fillTcpPacket(buff, p_len, msg_len, id);
     sockSendData(buff, ETH_IP_TCP_HDR_BASE_LEN + msg_len, id);
 }
 
 static void ftpd_sendSending(uint8_t *buff, uint32_t p_len, uint8_t id) {
-    ftpd_prepareHeaders(buff, p_len, 13, id);
-    struct tcpip_header* tcphdr = map_tcpip_header(buff);
-    memcpy((uint8_t*)(tcphdr)+TCP_HDR_BASE_LEN, "150 Sending\r\n", 13);
-    tcphdr->checksum = 0;
-    tcphdr->checksum = transportCalcChecksum(buff, ETH_IP_TCP_HDR_BASE_LEN + 13);
+    memcpy(buff + ETH_IP_TCP_HDR_BASE_LEN, "150 Sending\r\n", 13);
+    fillTcpPacket(buff, p_len, 13, id);
     sockSendData(buff, ETH_IP_TCP_HDR_BASE_LEN + 13, id);
 }
 
 static void ftpd_sendComplete(uint8_t *buff, uint32_t p_len, uint8_t id) {
-    ftpd_prepareHeaders(buff, p_len, 10, id);
-    struct tcpip_header* tcphdr = map_tcpip_header(buff);
-    memcpy((uint8_t*)(tcphdr)+TCP_HDR_BASE_LEN, "226 Done\r\n", 10);
-    tcphdr->checksum = 0;
-    tcphdr->checksum = transportCalcChecksum(buff, ETH_IP_TCP_HDR_BASE_LEN + 10);
+    memcpy(buff + ETH_IP_TCP_HDR_BASE_LEN, "226 Done\r\n", 10);
+    fillTcpPacket(buff, p_len, 10, id);
     sockSendData(buff, ETH_IP_TCP_HDR_BASE_LEN + 10, id);
 }
 
 static void ftpd_sendPWD(uint8_t *buff, uint32_t p_len, uint8_t id) {
     uint8_t msg_len = strlen(ftp_user.curr_dir);
-    ftpd_prepareHeaders(buff, p_len, msg_len + 5 + 3, id);
-    struct tcpip_header* tcphdr = map_tcpip_header(buff);
-    memcpy((uint8_t*)(tcphdr)+TCP_HDR_BASE_LEN, "257 \"", 5);
-    memcpy((uint8_t*)(tcphdr)+TCP_HDR_BASE_LEN+5, ftp_user.curr_dir, msg_len);
-    memcpy((uint8_t*)(tcphdr)+TCP_HDR_BASE_LEN+5+msg_len, "\"\r\n", 3);
-    tcphdr->checksum = 0;
-    tcphdr->checksum = transportCalcChecksum(buff, ETH_IP_TCP_HDR_BASE_LEN + msg_len + 5 + 3);
+    memcpy(buff + ETH_IP_TCP_HDR_BASE_LEN, "257 \"", 5);
+    memcpy(buff + ETH_IP_TCP_HDR_BASE_LEN+5, ftp_user.curr_dir, msg_len);
+    memcpy(buff + ETH_IP_TCP_HDR_BASE_LEN+5+msg_len, "\"\r\n", 3);
+    //memcpy(buff + ETH_IP_TCP_HDR_BASE_LEN, "530 unathorized\r\n", 17);
+    fillTcpPacket(buff, p_len, msg_len + 5 + 3, id);
     sockSendData(buff, ETH_IP_TCP_HDR_BASE_LEN + msg_len + 5 + 3, id);
 }
 
 static void ftpd_sendTYPE(uint8_t *buff, uint32_t p_len, uint8_t id) {
     struct tcpip_header* tcphdr = map_tcpip_header(buff);
     if (*(buff+0x3b) == 'I') {
-        ftpd_prepareHeaders(buff, p_len, 8, id);
-        memcpy((uint8_t*)(tcphdr)+TCP_HDR_BASE_LEN, "200 OK\r\n", 8);
-        tcphdr->checksum = 0;
-        tcphdr->checksum = transportCalcChecksum(buff, ETH_IP_TCP_HDR_BASE_LEN + 8);
+        memcpy(buff + ETH_IP_TCP_HDR_BASE_LEN, "200 OK\r\n", 8);
+        fillTcpPacket(buff, p_len, 8, id);
         sockSendData(buff, ETH_IP_TCP_HDR_BASE_LEN + 8, id);
         return;
     }
-    ftpd_prepareHeaders(buff, p_len, 17, id);
-    memcpy((uint8_t*)(tcphdr)+TCP_HDR_BASE_LEN, "504 Not support\r\n", 17);
-    tcphdr->checksum = 0;
-    tcphdr->checksum = transportCalcChecksum(buff, ETH_IP_TCP_HDR_BASE_LEN + 17);
+    memcpy(buff + ETH_IP_TCP_HDR_BASE_LEN, "504 Not support\r\n", 17);
+    fillTcpPacket(buff, p_len, 17, id);
     sockSendData(buff, ETH_IP_TCP_HDR_BASE_LEN + 17, id);
 }
 
@@ -413,7 +378,7 @@ static void ftpd_dataLIST(uint8_t *buff, uint32_t p_len, uint8_t id, uint8_t ver
         char fbuf[256] = {0};
         char * flags;
         uint8_t len = 0;
-        printf("LIST ENTER1\r\n");
+        //printf("LIST ENTER1\r\n");
         uint16_t buff_ptr = 0;
         snprintf(fbuf, 512, "drwxrwxr-x   3   1000  1000  4096   Jul 1  2025  .\r\n");
         len = strlen(fbuf);
@@ -445,16 +410,12 @@ static void ftpd_dataLIST(uint8_t *buff, uint32_t p_len, uint8_t id, uint8_t ver
             else break;
         }
         f_closedir(&dir);
-        ftpd_prepareHeaders(buff, p_len, buff_ptr, id);
-        tcphdr->checksum = 0;
-        tcphdr->checksum = transportCalcChecksum(buff, ETH_IP_TCP_HDR_BASE_LEN + buff_ptr);
+        fillTcpPacket(buff, p_len, buff_ptr, id);
         printf("LIST SEND2\r\n");
         sockSendData(buff, ETH_IP_TCP_HDR_BASE_LEN + buff_ptr, id);
     }
     struct ip_header* iphdr = map_ip_header(buff);
-    iphdr->id = iphdr->id + 0x0100; // +1 in network byte order;
     sock_softCloseSock(buff, p_len, id);
-    iphdr->id = iphdr->id + 0x0100; // +1 in network byte order;
     ftpd_sendComplete(buff, p_len, cmd_sock);
     ftp_user.data_transfer = FTP_DATA_IDLE;
     ftp_user.curr_cmd = 0;
