@@ -43,6 +43,7 @@ struct ftpd_cmd {
 struct ftp_data ftp_user = {0};
 
 extern uint8_t sect[512];
+static uint8_t file_transfer[512] = {0};
 static uint8_t cmd_sock = 0;
 static uint8_t data_sock = 0;
 static struct inet_addr *int_addr = NULL;
@@ -117,6 +118,7 @@ static void ftpd_dataSTOR(uint8_t *buff, uint32_t p_len, uint8_t id);
 static void ftpd_processCommand(uint8_t *buff, uint32_t p_len, uint8_t id);
 static void ftpd_handleDataStream(uint8_t *buff, uint32_t p_len, uint8_t id);
 static uint8_t ftpd_getCMD(uint8_t *buff, uint32_t p_len);
+static uint16_t ftpd_get_endline(uint8_t *buff, uint32_t p_len);
 
 static inline uint8_t ftpd_4bcmp(uint8_t *cmd1, uint8_t *cmd2) {
     if ( *(cmd1) == *(cmd2)
@@ -216,7 +218,7 @@ uint8_t ftpd_routine(uint8_t * buff, uint32_t len) {
     return 0;
 }
 
-static void ftpd_prepareHeaders(uint8_t *buff, uint32_t p_len, uint16_t data_len, uint8_t id) {
+/*static void ftpd_prepareHeaders(uint8_t *buff, uint32_t p_len, uint16_t data_len, uint8_t id) {
     struct eth_header* eth = map_eth_header(buff);
     struct ip_header* iphdr = map_ip_header(buff);
     struct tcpip_header* tcphdr = map_tcpip_header(buff);
@@ -248,7 +250,7 @@ static void ftpd_prepareHeaders(uint8_t *buff, uint32_t p_len, uint16_t data_len
     tcphdr->sequence = getSockSeq(id);
 
     tcphdr->window = 0xf601; // 502 NBO;
-}
+}*/
 
 static void ftpd_sendGreeting(uint8_t *buff, uint32_t p_len, uint8_t id) {
     memcpy(buff + ETH_IP_TCP_HDR_BASE_LEN, "220 bcmFTP\r\n", 12);
@@ -340,7 +342,6 @@ static void ftpd_sendPWD(uint8_t *buff, uint32_t p_len, uint8_t id) {
 }
 
 static void ftpd_sendTYPE(uint8_t *buff, uint32_t p_len, uint8_t id) {
-    struct tcpip_header* tcphdr = map_tcpip_header(buff);
     if (*(buff+0x3b) == 'I') {
         memcpy(buff + ETH_IP_TCP_HDR_BASE_LEN, "200 OK\r\n", 8);
         fillTcpPacket(buff, p_len, 8, id);
@@ -382,12 +383,12 @@ static void ftpd_dataLIST(uint8_t *buff, uint32_t p_len, uint8_t id, uint8_t ver
             result = f_readdir(&dir, &fileInfo);
             if (result==FR_OK && fileInfo.fname[0])
             {
-                printf("LIST SEND2 %d:%ld\r\n", fileInfo.fsize, p_len);
+                printf("LIST SEND2 %ld:%ld\r\n", fileInfo.fsize, p_len);
                 fn = fileInfo.lfname;
                 flen = fileInfo.fsize;
                 if(!strlen(fn)) {
                     fn = fileInfo.fname;
-                    flen = fileInfo.lfsize;
+                    //flen = fileInfo.lfsize;
                 }
                 if (verbose) {
                     if(fileInfo.fattrib&AM_DIR)
@@ -436,25 +437,30 @@ static void ftpd_sendSIZE(uint8_t *buff, uint32_t p_len, uint8_t id) {
         struct tcpip_header* tcphdr = map_tcpip_header(buff);
         char fbuf[64] = {0};
         uint32_t flen = 0;
+        uint16_t file_name_len = ftpd_get_endline(buff + ETH_IP_TCP_HDR_BASE_LEN + 5, p_len);
+        *(buff+ETH_IP_TCP_HDR_BASE_LEN+5+file_name_len) = '\0';
+        printf("SIZE FNAME %s\r\n", buff+ETH_IP_TCP_HDR_BASE_LEN+5);
         while(1)
         {
             result = f_readdir(&dir, &fileInfo);
             if (result==FR_OK && fileInfo.fname[0])
             {
-                if (strcmp(fileInfo.fname, buff+ETH_IP_TCP_HDR_BASE_LEN+4) == 0) {
+                if (strcmp(fileInfo.fname, buff+ETH_IP_TCP_HDR_BASE_LEN+5) == 0) {
                     break;
                 }
+            } else {
+                break;
             }
         }
-        printf("LIST SEND2 %d:%ld\r\n", fileInfo.fsize, p_len);
+        printf("SIZE SEND2 %ld:%ld\r\n", fileInfo.fsize, p_len);
         fn = fileInfo.lfname;
         flen = fileInfo.fsize;
         if(!strlen(fn)) {
             fn = fileInfo.fname;
-            flen = fileInfo.lfsize;
+            //flen = fileInfo.lfsize;
         }
         f_closedir(&dir);
-        snprintf(fbuf, 64, "%d\r\n", flen);
+        snprintf(fbuf, 64, "%ld\r\n", flen);
         uint8_t len = strlen(fbuf);
         memcpy((uint8_t*)(tcphdr)+TCP_HDR_BASE_LEN, fbuf, len);
         fillTcpPacket(buff, p_len, len, id);
@@ -486,6 +492,7 @@ static void ftpd_sendCCWD(uint8_t *buff, uint32_t p_len, uint8_t id) {
     }
 }
 
+#define DATA_BUFFER 512
 static void ftpd_dataSTOR(uint8_t *buff, uint32_t p_len, uint8_t id) {
 	//write
 	/*
@@ -515,44 +522,50 @@ static void ftpd_dataSTOR(uint8_t *buff, uint32_t p_len, uint8_t id) {
 static void ftpd_dataRETR(uint8_t *buff, uint32_t p_len, uint8_t id) {
 	//read
     char fbuf[512] = {0};
-    snprintf(fbuf, 512, "%s/%s\r\n", ftp_user.curr_dir, buff+ETH_IP_TCP_HDR_BASE_LEN+4);
+    snprintf(fbuf, 512, "%s%s\r\n", ftp_user.curr_dir, file_transfer);
+    printf("RETR fopen:%s\r\n", fbuf);
     FIL MyFile;
 
-    if(f_open(&MyFile,"123.txt",FA_READ)!=FR_OK)
+    if(f_open(&MyFile,fbuf,FA_READ)!=FR_OK)
     {
-        /*memcpy((uint8_t*)(tcphdr)+TCP_HDR_BASE_LEN, "501 Failed\r\n", 12);
+        memcpy(buff + ETH_IP_TCP_HDR_BASE_LEN, "501 Failed\r\n", 12);
         fillTcpPacket(buff, p_len, 12, id);
-        sockSendData(buff, ETH_IP_TCP_HDR_BASE_LEN + 12, id);*/
+        sockSendData(buff, ETH_IP_TCP_HDR_BASE_LEN + 12, id);
         return;
     }
-    uint16_t i=0, i1=0;
-    uint32_t ind=0;
+    printf("RETR SENDING\r\n");
+    uint16_t data_to_read = 0;
+    uint32_t index = 0;
+    uint32_t bytesread = 0;
     uint32_t f_size = MyFile.fsize;
     //sprintf(str1,"fsize: %lu\r\n",(unsigned long)f_size);
     //HAL_UART_Transmit(&huart1,(uint8_t*)str1,strlen(str1),0x1000);
-    ind=0;
     do
     {
-        if(f_size<512)
-        {
-            i1=f_size;
+        data_to_read = DATA_BUFFER;
+        if(f_size < DATA_BUFFER) {
+            data_to_read = f_size;
         }
-        else
-        {
-            i1=512;
-        }
-        f_size-=i1;
-        f_lseek(&MyFile,ind);
-      //  f_read(&MyFile,sect,i1,(UINT *)&bytesread);
+        f_size -= data_to_read;
+        f_lseek(&MyFile, index);
+        f_read(&MyFile, buff + ETH_IP_TCP_HDR_BASE_LEN, data_to_read, (UINT *)&bytesread);
+
+        printf("RETR READED %ld\r\n", bytesread);
+        fillTcpPacket(buff, p_len, bytesread, id);
+        sockSendData(buff, ETH_IP_TCP_HDR_BASE_LEN + bytesread, id);
+
       //  for(i=0;i<bytesread;i++)
         {
         //    HAL_UART_Transmit(&huart1,sect+i,1,0x1000);
         }
-        ind+=i1;
-    }
-    while(f_size>0);
+        index += data_to_read;
+    } while(f_size>0);
     //HAL_UART_Transmit(&huart1,(uint8_t*)"\r\n",2,0x1000);
     f_close(&MyFile);
+    sock_softCloseSock(buff, p_len, id);
+    ftpd_sendComplete(buff, p_len, cmd_sock);
+    ftp_user.data_transfer = FTP_DATA_IDLE;
+    ftp_user.curr_cmd = 0;
 
 }
 
@@ -598,6 +611,8 @@ static void ftpd_processCommand(uint8_t *buff, uint32_t p_len, uint8_t id) {
             ftp_user.curr_cmd = cmd;
             ftp_user.data_transfer = FTP_DATA_IDLE;
             ftp_user.data_transfer_ptr = 0;
+            uint16_t flen = ftpd_get_endline(buff + ETH_IP_TCP_HDR_BASE_LEN + 5, p_len);
+            memcpy(file_transfer, buff + ETH_IP_TCP_HDR_BASE_LEN + 5, flen);
             if(getSockState(data_sock) == SOCK_ESTABLISHED) {
                 ftp_user.data_transfer = FTP_DATA_TRANSMIT;
                 ftpd_sendSending(buff, p_len, id);
@@ -625,31 +640,36 @@ static void ftpd_processCommand(uint8_t *buff, uint32_t p_len, uint8_t id) {
 static void ftpd_handleDataStream(uint8_t *buff, uint32_t p_len, uint8_t id) {
     printf("DSSEND\r\n");
     uint8_t verb = 0;
+    if (ftp_user.data_transfer == FTP_DATA_IDLE) {
+        ftpd_sendSending(buff, p_len, cmd_sock);
+        ftp_user.data_transfer = FTP_DATA_TRANSMIT;
+        HAL_Delay(10);
+        return;
+    } else
+    if (ftp_user.data_transfer == FTP_DATA_FINISHED) {
+        printf("DSSEND COM\r\n");
+        ftpd_sendComplete(buff, p_len, cmd_sock);
+        ftp_user.data_transfer = FTP_DATA_IDLE;
+        ftp_user.curr_cmd = 0;
+        return;
+    }
+    //if (ftp_user.data_transfer != FTP_DATA_TRANSMIT) {
+      //  return;
+    //}
     switch(ftp_user.curr_cmd) {
 		case LIST_CMD:
             verb = 1;
 		case NLST_CMD:
-            if (ftp_user.data_transfer == FTP_DATA_IDLE) {
-                ftpd_sendSending(buff, p_len, cmd_sock);
-                ftp_user.data_transfer = FTP_DATA_TRANSMIT;
-                HAL_Delay(10);
-            } else
-            if (ftp_user.data_transfer == FTP_DATA_TRANSMIT) {
-                ftpd_dataLIST(buff, p_len, data_sock, verb);
-                ftp_user.data_transfer = FTP_DATA_FINISHED;
-                //HAL_Delay(10);
-            } else {
-                printf("DSSEND COM\r\n");
-                ftpd_sendComplete(buff, p_len, cmd_sock);
-                ftp_user.data_transfer = FTP_DATA_IDLE;
-                ftp_user.curr_cmd = 0;
-            }
+            ftpd_dataLIST(buff, p_len, data_sock, verb);
+            ftp_user.data_transfer = FTP_DATA_FINISHED;
 			break;
 		case RETR_CMD:
-            ftpd_dataRETR(buff, p_len, id);
+            ftpd_dataRETR(buff, p_len, data_sock);
+            ftp_user.data_transfer = FTP_DATA_FINISHED;
 			break;
 		case STOR_CMD:
             ftpd_dataSTOR(buff, p_len, id);
+            ftp_user.data_transfer = FTP_DATA_FINISHED;
 			break;
 		case MKD_CMD:
 			break;
@@ -673,5 +693,14 @@ static uint8_t ftpd_getCMD(uint8_t *buff, uint32_t p_len) {
         id++;
     }
     return MAX_CMD; // error
+}
+
+static uint16_t ftpd_get_endline(uint8_t *buff, uint32_t p_len) {
+    uint16_t len = 0;
+    do {
+        len++;
+    } while(*(buff+len) != '\r' && *(buff+len) != '\n');
+    printf("GETL arg:%d\r\n", len);
+    return len;
 }
 

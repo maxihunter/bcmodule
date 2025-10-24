@@ -246,7 +246,7 @@ uint8_t socketRoutine(uint8_t *buff, uint32_t len) {
         return 0;
     }
     if ( socks[i].state == SOCK_ESTABLISHED && (tcphdr->flags & TCP_FLAG_ACK) && !(tcphdr->flags & TCP_FLAG_PSH)) {
-        socks[i].next_ack = addBE32BitValue(tcphdr->sequence, 1, 1);
+        //socks[i].next_ack = addBE32BitValue(tcphdr->sequence, 1, 1);
         return 0;
     }
     if ( socks[i].state == SOCK_ESTABLISHED && (tcphdr->flags & TCP_FLAG_PSH)) {
