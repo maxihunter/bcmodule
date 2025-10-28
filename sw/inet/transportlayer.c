@@ -186,7 +186,7 @@ uint8_t socketRoutine(uint8_t *buff, uint32_t len) {
         // TCP OPTIONS
         buff[ETH_IP_TCP_HDR_BASE_LEN]=2;
         buff[ETH_IP_TCP_HDR_BASE_LEN+1]=4;
-        buff[ETH_IP_TCP_HDR_BASE_LEN+2]=0x05;
+        buff[ETH_IP_TCP_HDR_BASE_LEN+2]=0x04;
         buff[ETH_IP_TCP_HDR_BASE_LEN+3]=0x0;
 #ifdef SACK_PERMIT_ENABLE
         tcphdr->flags = 0x0080;
@@ -264,6 +264,9 @@ uint8_t socketRoutine(uint8_t *buff, uint32_t len) {
         //printf("ACKs %x:%x:%x\r\n", iphdr->total_len, dlen, socks[i].last_data_len);
         //socks[i].next_ack = sock_sendAck(buff, len, socks[i].last_data_len);
         return i;
+    }
+    if ( tcphdr->flags & TCP_FLAG_RST ) {
+        socks[i].state = SOCK_LISTEN;
     }
     return 0;
 }
