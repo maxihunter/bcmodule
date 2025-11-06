@@ -64,6 +64,7 @@ uint8_t socketRoutine(uint8_t *buff, uint32_t len);
 uint16_t transportCalcChecksum(uint8_t *buff, uint32_t p_len);
 uint16_t getSockLastDataLen(uint8_t id);
 uint32_t getSockNextAck(uint8_t id);
+void sock_sendAck(uint8_t *buff, uint32_t p_len, uint8_t sockid);
 void sock_softCloseSock(uint8_t *buff, uint32_t p_len, uint8_t sockid);
 void sock_forceCloseSock(uint8_t *buff, uint32_t p_len, uint8_t sockid);
 

@@ -33,7 +33,6 @@
 
 //#define SACK_PERMIT_ENABLE
 
-static uint32_t sock_sendAck(uint8_t *buff, uint32_t p_len, uint16_t ldata);
 static uint32_t addBE32BitValue(uint32_t val1, uint32_t val2, uint8_t smallval);
 static void sock_makeTcpHeader(uint8_t *buff, uint32_t p_len, uint8_t sockid, uint16_t data_len, uint16_t flags);
 
@@ -99,11 +98,7 @@ uint32_t getSockNextAck(uint8_t id) {
 }
 
 void sockSendData(uint8_t *buff, uint32_t len, uint8_t id) {
-    //socks[id].seq += len - ETH_IP_TCP_HDR_BASE_LEN;
     socks[id].seq = addBE32BitValue(socks[id].seq, len - ETH_IP_TCP_HDR_BASE_LEN, 1);
-    struct ip_header* iphdr = map_ip_header(buff);
-    //socks[id].ip_id++;
-    //iphdr->id = __REV16(socks[id].ip_id);
     enc28j60PacketSend(len,buff);
 }
 
@@ -255,14 +250,10 @@ uint8_t socketRoutine(uint8_t *buff, uint32_t len) {
         struct tcpip_header* tcphdr = map_tcpip_header(buff);
         socks[i].next_ack = addBE32BitValue(tcphdr->sequence, socks[i].last_data_len, 1);
         //printf("ACKs %x:%x:%x\r\n", iphdr->total_len, dlen, socks[i].last_data_len);
-        //socks[i].next_ack = sock_sendAck(buff, len, socks[i].last_data_len);
         return i;
     }
     if ( socks[i].state == SOCK_ESTABLISHED && (tcphdr->flags & TCP_FLAG_ACK) && (tcphdr->flags & TCP_FLAG_PSH)) {
-        //uint16_t dlen = INT16_ITON(iphdr->total_len);
-        //socks[i].last_data_len = (dlen - (IP_HDR_BASE_LEN+TCP_HDR_BASE_LEN));
         //printf("ACKs %x:%x:%x\r\n", iphdr->total_len, dlen, socks[i].last_data_len);
-        //socks[i].next_ack = sock_sendAck(buff, len, socks[i].last_data_len);
         return i;
     }
     if ( tcphdr->flags & TCP_FLAG_RST ) {
@@ -301,75 +292,9 @@ uint16_t transportCalcChecksum(uint8_t *buff, uint32_t p_len) {
     return res;
 }
 
-static uint32_t sock_sendAck(uint8_t *buff, uint32_t p_len, uint16_t ldata) {
-#ifndef SACK_PERMIT_ENABLE
-    uint8_t abuff[ETH_IP_TCP_HDR_BASE_LEN] = {0};
-    memcpy(abuff, buff, ETH_IP_TCP_HDR_BASE_LEN);
-	struct tcpip_header* tcphdr = map_tcpip_header(abuff);
-    //uint16_t ldata = getSockLastDataLen(id);
-    uint32_t ack = tcphdr->ack_num;
-    uint8_t *ack_ptr = (uint8_t*)&(tcphdr->sequence);
-    uint8_t *ld_ptr = (uint8_t*)&(ldata);
-    uint8_t overfl = 0;
-
-    if (*(ack_ptr+3) + *(ld_ptr) > 255) {
-        overfl = 1;
-    }
-    *(ack_ptr+3) += *(ld_ptr);
-    if (*(ack_ptr+2) + *(ld_ptr+1) + overfl > 255) {
-        if (*(ack_ptr+1) == 255)
-            *(ack_ptr) += 1;
-        *(ack_ptr+1) += 1;
-    }
-    tcphdr->ack_num = tcphdr->sequence;
-#ifdef EXTRA_ACK_REQUIRED
-    struct eth_header* eth = map_eth_header(abuff);
-    struct ip_header* iphdr = map_ip_header(abuff);
-	//struct tcpip_header* tcphdr = map_tcpip_header(abuff);
-
-    memcpy((uint8_t*)&(eth->dst_mac), eth->src_mac, 6);
-    memcpy((uint8_t*)&(eth->src_mac), int_addr->macaddr, 6);
-
-    memcpy((uint8_t*)&(iphdr->dst_ip), (uint8_t*)&(iphdr->src_ip), 4);
-    memcpy((uint8_t*)&(iphdr->src_ip), (uint8_t*)&(int_addr->ipaddr), 4);
-
-    iphdr->total_len = 0x2800; // 40 in network order INT16_ITON
-
-    iphdr->checksum = 0;
-    iphdr->checksum = ipCalcChecksum(abuff);
-    uint16_t dp = tcphdr->dport;
-    tcphdr->dport = tcphdr->sport;
-    tcphdr->sport = dp;
-    tcphdr->flags = 0x0050;
-    tcphdr->flags |= TCP_FLAG_ACK;
-
-    tcphdr->sequence = ack;
-
-    tcphdr->window = 0xf601; // 502 NBO;
-    tcphdr->checksum = 0;
-    tcphdr->checksum = transportCalcChecksum(abuff, ETH_IP_TCP_HDR_BASE_LEN); // ACK packet have no data
-    enc28j60PacketSend(ETH_IP_TCP_HDR_BASE_LEN,abuff);
-#endif
-    return tcphdr->ack_num;
-#else
-	uint8_t *ld_ptr = (uint8_t*)&(ldata);
-	uint8_t ack_val[4];
-	uint8_t overfl = 0;
-	
-	memcpy((uint8_t*)&ack_val, (uint8_t*)&(tcphdr->sequence), 4);
-	uint8_t *ack_ptr = ack_val;
-
-    if (*(ack_ptr+3) + *(ld_ptr) > 255) {
-        overfl = 1;
-    }
-    *(ack_ptr+3) += *(ld_ptr);
-    if (*(ack_ptr+2) + *(ld_ptr+1) + overfl > 255) {
-        if (*(ack_ptr+1) == 255)
-            *(ack_ptr) += 1;
-        *(ack_ptr+1) += 1;
-    }
-	return (uint32_t) ack_val;
-#endif
+void sock_sendAck(uint8_t *buff, uint32_t p_len, uint8_t sockid) {
+    sock_makeTcpHeader(buff, p_len, sockid, 0, TCP_FLAG_ACK);
+    enc28j60PacketSend(p_len,buff);
 }
 
 static void sock_makeTcpHeader(uint8_t *buff, uint32_t p_len, uint8_t sockid, uint16_t data_len, uint16_t flags) {
